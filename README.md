@@ -1,7 +1,6 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/4fthawaiian/trashmap/main/screenshot.png">
+<p align="center">
   <img alt="TrashMap — 3D space debris visualization" src="screenshot.png" width="100%">
-</picture>
+</p>
 
 <p align="center">
   <b>Interactive 3D visualization of space debris orbiting Earth</b><br>
@@ -121,3 +120,7 @@ MIT — use freely, adapt openly.
 <p align="center">
   <sub>Built with Flutter • SGP4 • CelesTrak</sub>
 </p>
+
+---
+
+*Built from scratch in a single ~3-hour session with [Paseo](https://github.com/4fthawaiian/trashmap) — an AI coding companion that turns ideas into working software. No templates, no boilerplate, just a conversation and a vision.*
