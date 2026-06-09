@@ -1,0 +1,44 @@
+# Flutter
+.dart_tool/
+.packages
+build/
+*.iml
+.idea/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+packages/
+.pub-preload-cache/
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/key.properties
+*.keystore
+*.jks
+
+# iOS
+ios/.symlinks/
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Web
+web/favicon.png
+web/icons/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
