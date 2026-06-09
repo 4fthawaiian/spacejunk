@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="TrashMap — 3D space debris visualization" src="screenshot.png" width="100%">
+  <img alt="TrashMap — 3D space debris visualization" src="new_screenshot.png" width="100%">
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@ TrashMap renders the orbital debris environment around Earth in real-time 3D. Hu
 
 | Debris view | Filter panel | Tap popup |
 |:---:|:---:|:---:|
-| ![Main view](screenshot.png) | *(filter sheet with per-shell toggles)* | *(tap any object for details)* |
+| ![Main view](new_screenshot.png) | *(filter sheet with per-shell toggles)* | *(tap any object for details)* |
 
 ## 🚀 Getting Started
 
