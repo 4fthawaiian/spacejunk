@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../models/debris_data.dart';
 import '../painters/space_debris_painter.dart';
@@ -236,6 +237,16 @@ class _HomeScreenState extends State<HomeScreen>
   // ------------------------------------------------------------------
   // INTERACTION
   // ------------------------------------------------------------------
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      // Mouse wheel / trackpad scroll → zoom
+      // Negative dy = scroll up = zoom in, positive dy = scroll down = zoom out
+      // delta is ~120 per notch on most mice, smaller on trackpads
+      final zoomDelta = -event.scrollDelta.dy * 0.0012;
+      _targetZoom = (_zoom + zoomDelta).clamp(0.4, 2.5);
+    }
+  }
+
   void _onScaleStart(ScaleStartDetails d) {
     _lastFocalPoint = d.focalPoint;
     _dragStartX = _rotationX;
@@ -401,12 +412,14 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
-      body: GestureDetector(
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        onScaleEnd: _onScaleEnd,
-        onTapUp: _onTapUp,
-        child: AnimatedBuilder(
+      body: Listener(
+        onPointerSignal: _onPointerSignal,
+        child: GestureDetector(
+          onScaleStart: _onScaleStart,
+          onScaleUpdate: _onScaleUpdate,
+          onScaleEnd: _onScaleEnd,
+          onTapUp: _onTapUp,
+          child: AnimatedBuilder(
           animation: _animController,
           builder: (context, _) {
             _updateAutoRotate();
@@ -449,6 +462,7 @@ class _HomeScreenState extends State<HomeScreen>
             );
           },
         ),
+      ),
       ),
     );
   }
@@ -785,7 +799,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: AnimatedOpacity(
         opacity: _showControlsHint ? 1.0 : 0.0,
         duration: const Duration(seconds: 2),
-        child: Center(child: Text('Tap any dot · Drag to orbit · Pinch to zoom',
+        child: Center(child: Text('Tap any dot · Drag to orbit · Scroll to zoom',
           style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.12), letterSpacing: 1))),
       ),
     );
