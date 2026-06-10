@@ -34,11 +34,12 @@ class _HomeScreenState extends State<HomeScreen>
   double _dragStartX = 0.15, _dragStartY = 0.0;
 
   // ---- Filter ----
-  final Set<String> _visibleShells = {'LEO', 'MEO', 'GEO', 'Debris', 'Station'};
+  final Set<String> _visibleShells = {'LEO', 'MEO', 'GEO', 'Debris', 'Station', 'Rocket-Body'};
 
   // ---- Counts ----
   int _leoCount = 0, _meoCount = 0, _geoCount = 0, _debrisCount = 0;
   int _stationCount = 0, _totalCount = 0;
+  int _rocketBodyCount = 0;
 
   // ---- Data source ----
   bool _isLoadingLive = false;
@@ -209,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
     _geoCount = 0;
     _debrisCount = 0;
     _stationCount = 0;
+    _rocketBodyCount = 0;
     for (final p in _allParticles) {
       switch (p.shell) {
         case 'LEO': _leoCount++; break;
@@ -216,6 +218,7 @@ class _HomeScreenState extends State<HomeScreen>
         case 'GEO': _geoCount++; break;
         case 'Debris': _debrisCount++; break;
         case 'Station': _stationCount++; break;
+        case 'Rocket-Body': _rocketBodyCount++; break;
       }
     }
     _totalCount = _allParticles.length;
@@ -529,6 +532,7 @@ class _HomeScreenState extends State<HomeScreen>
       _Pill('GEO', const Color(0xFF4FC3F7)),
       _Pill('Debris', const Color(0xFFEF5350)),
       _Pill('Station', const Color(0xFFFFD740)),
+      _Pill('Rocket-Body', const Color(0xFFC10A0A)),
     ];
 
     return Positioned(
@@ -646,6 +650,8 @@ class _HomeScreenState extends State<HomeScreen>
             _statItem(_visibleShells.contains('Debris') ? '$_debrisCount' : '—', 'Debris', const Color(0xFFEF5350)),
             _divider(),
             _statItem(_visibleShells.contains('Station') ? '$_stationCount' : '—', 'Stn', const Color(0xFFFFD740)),
+            _divider(),
+            _statItem(_visibleShells.contains('Rocket-Body') ? '$_rocketBodyCount' : '—', 'RB', const Color(0xFFC10A0A)),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: _showInfoDialog,
@@ -716,6 +722,8 @@ class _HomeScreenState extends State<HomeScreen>
           _legendDot(const Color(0xFFEF5350), 'Debris'),
           const SizedBox(height: 5),
           _legendDot(const Color(0xFFFFD740), 'Station'),
+          const SizedBox(height: 5),
+          _legendDot(const Color(0xFFC10A0A), 'RB'),
         ]),
       ),
     );
@@ -1105,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _FilterSheet(
-        visibleShells: _visibleShells,
+        initialVisibleShells: _visibleShells,
         totalCount: _totalCount,
         leoCount: _leoCount,
         meoCount: _meoCount,
@@ -1126,8 +1134,8 @@ class _HomeScreenState extends State<HomeScreen>
 // ======================================================================
 // FILTER + INFO BOTTOM SHEET
 // ======================================================================
-class _FilterSheet extends StatelessWidget {
-  final Set<String> visibleShells;
+class _FilterSheet extends StatefulWidget {
+  final Set<String> initialVisibleShells;
   final int totalCount, leoCount, meoCount, geoCount, debrisCount, stationCount;
   final String dataSource;
   final bool showStarfield;
@@ -1135,7 +1143,7 @@ class _FilterSheet extends StatelessWidget {
   final VoidCallback onToggleStarfield;
 
   const _FilterSheet({
-    required this.visibleShells,
+    required this.initialVisibleShells,
     required this.totalCount,
     required this.leoCount,
     required this.meoCount,
@@ -1149,7 +1157,48 @@ class _FilterSheet extends StatelessWidget {
   });
 
   @override
+  _FilterSheetState createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late Set<String> _visibleShells;
+  late bool _showStarfield;
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleShells = Set.from(widget.initialVisibleShells);
+    _showStarfield = widget.showStarfield;
+  }
+
+  void _handleToggle(String shell) {
+    setState(() {
+      if (_visibleShells.contains(shell)) {
+        _visibleShells.remove(shell);
+      } else {
+        _visibleShells.add(shell);
+      }
+    });
+    widget.onToggle(shell);
+  }
+
+  void _handleToggleStarfield() {
+    setState(() {
+      _showStarfield = !_showStarfield;
+    });
+    widget.onToggleStarfield();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final totalCount = widget.totalCount;
+    final leoCount = widget.leoCount;
+    final meoCount = widget.meoCount;
+    final geoCount = widget.geoCount;
+    final debrisCount = widget.debrisCount;
+    final stationCount = widget.stationCount;
+    final dataSource = widget.dataSource;
+
     return Container(
       width: double.infinity,
       constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
@@ -1206,9 +1255,10 @@ class _FilterSheet extends StatelessWidget {
           _filterRow(const Color(0xFFFFD740), 'Station', 'Space Stations',
             'International Space Station, Tiangong &\nother crewed outposts — shown at actual position.',
             stationCount),
+          _filterRow(const Color(0xFFC10A0A), 'Rocket-Body', 'Rocket Bodies', 'Launch vehicles and spent stages', 0),
 
           const SizedBox(height: 10),
-          _starfieldToggle(),
+          _starfieldToggle(_showStarfield, _handleToggleStarfield),
           const SizedBox(height: 16),
           _divider(),
           const SizedBox(height: 16),
@@ -1254,11 +1304,11 @@ class _FilterSheet extends StatelessWidget {
   Widget _divider() => Container(height: 1, color: Colors.white.withValues(alpha: 0.06));
 
   Widget _filterRow(Color color, String id, String title, String description, int count) {
-    final isVisible = visibleShells.contains(id);
+    final isVisible = _visibleShells.contains(id);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: GestureDetector(
-        onTap: () => onToggle(id),
+        onTap: () => _handleToggle(id),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
           opacity: isVisible ? 1.0 : 0.35,
@@ -1291,7 +1341,7 @@ class _FilterSheet extends StatelessWidget {
                 child: CupertinoSwitch(
                   value: isVisible,
                   activeTrackColor: color.withValues(alpha: 0.6),
-                  onChanged: (_) => onToggle(id),
+                  onChanged: (_) => _handleToggle(id),
                 ),
               ),
             ]),
@@ -1301,7 +1351,7 @@ class _FilterSheet extends StatelessWidget {
     );
   }
 
-  Widget _starfieldToggle() {
+  Widget _starfieldToggle(bool showStarfield, VoidCallback onToggleStarfield) {
     return GestureDetector(
       onTap: onToggleStarfield,
       child: Container(

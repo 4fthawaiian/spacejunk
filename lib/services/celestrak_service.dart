@@ -110,6 +110,7 @@ class CelestrakService {
     'amateur',
     'cubesat',
     'active',
+    'rocket-body',
   ];
 
   CelestrakState _state = CelestrakState.initial;
@@ -266,6 +267,8 @@ class CelestrakService {
           shell = 'Station';
         } else if (obj.objectType == 'debris') {
           shell = 'Debris';
+        } else if (obj.objectType == 'rocket_body') {
+          shell = 'Rocket-Body';
         } else if (alt < 2000) {
           shell = 'LEO';
         } else if (alt < 35786) {

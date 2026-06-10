@@ -17,6 +17,12 @@
 - [x] CORS proxy fallback for web builds
 - [x] Android release build (network permissions + cleartext traffic enabled)
 - [x] Android deployment (Impeller/Vulkan renderer)
+- [x] Rocket body support — CelesTrak data ingestion, orange coloring, shell mapping
+- [x] Rocket body toggle — quick-access pill + filter-sheet row with live CupertinoSwitch
+- [x] Rocket body counter — per-shell object counts extended to Rocket-Body shell
+- [x] Rocket body legend entry — dot + label on the right-side legend
+- [x] Reactive filter sheet — `_FilterSheet` converted to `StatefulWidget` with local state for instant toggle feedback
+- [x] Render order fix — debris particles drawn on top of Earth so objects don't disappear behind the planet
 
 ## 🎯 Up Next
 

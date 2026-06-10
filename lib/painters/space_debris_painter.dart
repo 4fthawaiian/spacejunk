@@ -39,11 +39,11 @@ class SpaceDebrisPainter extends CustomPainter {
     // 2. Orbital rings (behind everything)
     _drawOrbitalRings(canvas, cx, cy, scale);
 
-    // 3. Debris particles
-    _drawDebris(canvas, cx, cy, scale, size);
-
-    // 4. Earth (on top, hides objects behind it)
+    // 3. Earth (behind debris)
     _drawEarth(canvas, cx, cy, scale);
+
+    // 4. Debris particles (on top of Earth)
+    _drawDebris(canvas, cx, cy, scale, size);
 
     // 5. Station markers (on top of everything)
     _drawStations(canvas, cx, cy, scale, size);
