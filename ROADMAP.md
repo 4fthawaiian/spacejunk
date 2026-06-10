@@ -28,6 +28,8 @@
 - [x] Live site at https://junk.4ft.me — nginx vhost, Let's Encrypt SSL, SPA routing
 - [x] Auto-deploy pipeline — GitHub Action builds web + rsyncs to server on every push to main
 - [x] Desktop/tablet UI scaling — 150% zoom via SizedBox + MediaQuery + Transform.scale on screens >=600px
+- [x] Mouse wheel / trackpad scroll zoom for desktop web — scroll up zooms in, down zooms out
+
 
 ## 🎯 Up Next
 
@@ -42,6 +44,7 @@
 - [ ] Periodic auto-refresh — re-fetch live data every 30 min automatically
 - [ ] Collision event overlays — mark known historical satellite collisions
 - [ ] Distinguish live tracked objects from procedural in the view
+- [ ] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info on tap popup (branch: satcat-enrichment)
 
 ### Performance
 - [ ] GPU batching for higher particle counts
