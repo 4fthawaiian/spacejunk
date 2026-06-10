@@ -23,6 +23,28 @@ class TrashMapApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.black,
         visualDensity: VisualDensity.compact,
       ),
+      builder: (context, child) {
+        final size = MediaQuery.of(context).size;
+        final isDesktop = size.width >= 600;
+        if (isDesktop) {
+          return Center(
+            child: Transform.scale(
+              scale: 1.5,
+              child: SizedBox(
+                width: size.width / 1.5,
+                height: size.height / 1.5,
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    size: Size(size.width / 1.5, size.height / 1.5),
+                  ),
+                  child: child!,
+                ),
+              ),
+            ),
+          );
+        }
+        return child!;
+      },
       home: const HomeScreen(),
     );
   }
