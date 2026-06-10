@@ -27,6 +27,7 @@
 - [x] WebAssembly/CanvasKit build support (`flutter build web --wasm`)
 - [x] Live site at https://junk.4ft.me — nginx vhost, Let's Encrypt SSL, SPA routing
 - [x] Auto-deploy pipeline — GitHub Action builds web + rsyncs to server on every push to main
+- [x] Desktop/tablet UI scaling — 150% zoom via SizedBox + MediaQuery + Transform.scale on screens >=600px
 
 ## 🎯 Up Next
 
