@@ -38,6 +38,7 @@
 - [ ] Speed controls — slow down / speed up auto-rotation
 - [ ] True blackout mode for OLED screens
 - [ ] Animated transitions when toggling filter shells
+- [ ] Remove "Data source" row from popup info cards (always CelesTrak for live data)
 
 ### Data & Reality
 - [ ] Full catalog — add more CelesTrak groups for thousands more tracked objects
