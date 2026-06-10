@@ -98,9 +98,13 @@ class CelestrakFetchResult {
 class CelestrakService {
   static const String _baseUrl = 'https://celestrak.org/NORAD/elements/gp.php';
 
-  /// CORS proxy for web platforms where CelesTrak doesn't send CORS headers.
-  /// Uses https://corsproxy.io/ as fallback.
-  static const String _corsProxy = 'https://corsproxy.io/?url=';
+  /// CORS proxies for web platforms where CelesTrak doesn't send CORS headers.
+  /// Tried in order until one works.
+  static const List<String> _corsProxies = [
+    'https://corsproxy.io/?url=',
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.org/?url=',
+  ];
 
   /// Groups to fetch. Each returns a JSON array of orbital element sets.
   static const List<String> defaultGroups = [
@@ -147,27 +151,25 @@ class CelestrakService {
       final allObjects = <CelestrakObject>[];
       final seenIds = <int>{};
 
-      // Fetch each group — try direct first, then CORS proxy
+      // Fetch each group — try direct first, then CORS proxies
       for (final group in groups) {
         try {
           final url = '$_baseUrl?GROUP=$group&FORMAT=json';
-          final encodedUrl = Uri.encodeComponent(url);
-
           http.Response response;
+
+          // Try direct fetch first
           try {
             response = await http.get(Uri.parse(url)).timeout(
               const Duration(seconds: 10),
             );
           } catch (_) {
-            // Direct failed, try CORS proxy
-            try {
-              response = await http.get(
-                Uri.parse('$_corsProxy$encodedUrl'),
-              ).timeout(const Duration(seconds: 15));
-            } catch (_) {
-              // Both failed, skip this group
-              continue;
-            }
+            // Direct failed, try each CORS proxy in order
+            response = await _fetchWithProxies(url);
+          }
+
+          if (response.statusCode != 200) {
+            // Try proxies if direct returned non-200
+            response = await _fetchWithProxies(url);
           }
 
           if (response.statusCode != 200) continue;
@@ -330,6 +332,22 @@ class CelestrakService {
       default:
         return 0.7;
     }
+  }
+
+  /// Try each CORS proxy in order until one returns a successful response.
+  Future<http.Response> _fetchWithProxies(String rawUrl) async {
+    final encodedUrl = Uri.encodeComponent(rawUrl);
+    for (final proxy in _corsProxies) {
+      try {
+        final response = await http.get(
+          Uri.parse('$proxy$encodedUrl'),
+        ).timeout(const Duration(seconds: 15));
+        if (response.statusCode == 200) return response;
+      } catch (_) {
+        continue;
+      }
+    }
+    throw CelestrakException('All CORS proxies failed');
   }
 }
 

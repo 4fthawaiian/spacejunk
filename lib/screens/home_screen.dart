@@ -45,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isLoadingLive = false;
   String _dataSource = 'procedural';
   String _lastUpdate = '';
+  String _fetchError = '';
   bool _showControlsHint = true;
 
   // ---- Time slider (historical view) ----
@@ -103,11 +104,13 @@ class _HomeScreenState extends State<HomeScreen>
       // Always blend: live data + procedural debris + procedural stations
       _allParticles = [...live, ...debris, ...stations];
       _dataSource = 'live';
+      _fetchError = '';
       _lastUpdate = DateTime.now().toLocal().toString().substring(0, 19);
       _applyFiltersAndTime();
     } catch (e) {
       if (!mounted) return;
       _dataSource = 'procedural';
+      _fetchError = 'Live data unavailable — showing simulated orbits';
       _allParticles = DebrisGenerator.generate();
       _propagators = [];
       _celestrakObjects = [];
@@ -762,6 +765,12 @@ class _HomeScreenState extends State<HomeScreen>
           if (_dataSource == 'live' && _lastUpdate.isNotEmpty)
             Text(_lastUpdate,
               style: TextStyle(fontSize: 8, letterSpacing: 1, color: Colors.white.withValues(alpha: 0.15))),
+          if (_fetchError.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(_fetchError,
+                style: TextStyle(fontSize: 8, letterSpacing: 0.5, color: Colors.orange.withValues(alpha: 0.5))),
+            ),
         ],
       ]),
     );

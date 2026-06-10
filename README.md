@@ -62,10 +62,19 @@ flutter install -d <device-id>
 ### Run on Web
 
 ```bash
-flutter run -d chrome
+# Standard build
+flutter build web --release
+
+# With WebAssembly + CanvasKit (better performance for 3D graphics)
+flutter build web --release --wasm
 ```
 
-> **Note:** CelesTrak does not send CORS headers, so the web build automatically falls back to `corsproxy.io`. This may be slower or rate-limited. Android builds fetch directly.
+Serve the `build/web` directory via any static file server (GitHub Pages, Vercel, Netlify, etc.).
+
+> **CORS note:** CelesTrak does not send CORS headers, so the web build automatically falls
+> back to a chain of public CORS proxies (`corsproxy.io`, `allorigins.win`, `corsproxy.org`).
+> If the live fetch fails, the app gracefully falls back to procedurally-generated data.
+> Android/iOS builds fetch directly without issues.
 
 ## 🧭 Orbital Shells
 
@@ -76,6 +85,7 @@ flutter run -d chrome
 | **GEO** | 35,786 km | 🔵 Cyan | Weather, TV broadcast, communications |
 | **Debris** | various | 🔴 Red | Untracked fragments <10 cm (procedural) |
 | **Station** | ~400–420 km | 🟡 Gold | Crewed space stations (ISS, Tiangong) |
+| **Rocket Body** | various | 🟠 Orange | Spent launch vehicles and upper stages |
 
 ## 🔧 Architecture
 
@@ -105,7 +115,7 @@ DebrisGenerator.generate()  →  _allParticles  →  _displayParticles  →  Spa
 
 ## 📡 Data Sources
 
-**[CelesTrak](https://celestrak.org)** — Real-time TLE (Two-Line Element) sets maintained by the US Space Force. Fetched groups: `stations`, `visual`, `last-30-days`, `amateur`, `cubesat`, `active`.
+**[CelesTrak](https://celestrak.org)** — Real-time TLE (Two-Line Element) sets maintained by the US Space Force. Fetched groups: `stations`, `visual`, `last-30-days`, `amateur`, `cubesat`, `active`, `rocket-body`.
 
 **SGP4** — The Simplified General Perturbations model (#4) is the standard algorithm for propagating near-Earth orbit elements. This Dart implementation handles secular perturbations (drag, J₂ gravity) and Kepler equation solving.
 
