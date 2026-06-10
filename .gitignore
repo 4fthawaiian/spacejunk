@@ -25,8 +25,9 @@ ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
 
 # Web
-web/favicon.png
-web/icons/
+# These need to be tracked for CI builds
+# web/favicon.png
+# web/icons/
 
 # IDE
 .vscode/
