@@ -23,6 +23,10 @@
 - [x] Rocket body legend entry — dot + label on the right-side legend
 - [x] Reactive filter sheet — `_FilterSheet` converted to `StatefulWidget` with local state for instant toggle feedback
 - [x] Render order fix — debris particles drawn on top of Earth so objects don't disappear behind the planet
+- [x] Multi-proxy CORS fallback chain for web reliability (corsproxy.io, allorigins.win, corsproxy.org)
+- [x] WebAssembly/CanvasKit build support (`flutter build web --wasm`)
+- [x] Live site at https://junk.4ft.me — nginx vhost, Let's Encrypt SSL, SPA routing
+- [x] Auto-deploy pipeline — GitHub Action builds web + rsyncs to server on every push to main
 
 ## 🎯 Up Next
 
@@ -48,3 +52,10 @@
 - [ ] Megaconstellation visualization (Starlink, OneWeb, Kuiper)
 - [ ] Spacecraft debris avoidance maneuvers
 - [ ] Kessler syndrome simulation (cascade effect)
+
+### Infrastructure & Ops
+- [ ] Bundle favicon/apple-touch-icon for site
+- [ ] Add `junk.4ft.me` sitemap / SEO meta
+- [ ] WASM build via GitHub Action for better perf
+- [ ] Health check endpoint monitoring
+- [ ] Staging branch with preview deploys
