@@ -1,7 +1,10 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/debris_data.dart';
 import '../models/satcat_record.dart';
 import '../painters/space_debris_painter.dart';
@@ -13,6 +16,8 @@ import '../utils/url_params.dart';
 
 /// Seconds per day
 const _daySecs = 86400.0;
+const _shareBaseUrl = 'https://spacejunk.4ft.me/';
+const _allShellIds = {'LEO', 'MEO', 'GEO', 'Debris', 'Station', 'Rocket-Body'};
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -498,6 +503,66 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ------------------------------------------------------------------
+  // SHARE LINK
+  // ------------------------------------------------------------------
+  String _formatShareNumber(double value) {
+    final rounded = value.toStringAsFixed(2);
+    return rounded.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  Uri _buildShareUri() {
+    final params = <String, String>{};
+
+    if (_visibleConstellations.length < constellation.constellationGroups.length) {
+      final sorted = _visibleConstellations.toList()..sort();
+      params['constellations'] = sorted.isEmpty ? 'none' : sorted.join(',');
+    }
+
+    final hiddenShells = _allShellIds.difference(_visibleShells).toList()..sort();
+    if (hiddenShells.isNotEmpty) {
+      params['hideShells'] = hiddenShells.join(',');
+    }
+
+    if ((_targetZoom - 0.45).abs() > 0.01) {
+      params['zoom'] = _formatShareNumber(_targetZoom.clamp(0.4, 2.5));
+    }
+
+    if (_showTimeSlider || _historicalOffsetDays != 0.0) {
+      params['time'] = _formatShareNumber(_historicalOffsetDays.clamp(-365, 365));
+    }
+
+    return Uri.parse(_shareBaseUrl).replace(queryParameters: params.isEmpty ? null : params);
+  }
+
+  Future<void> _shareLink() async {
+    final shareUri = _buildShareUri();
+    final shareUrl = shareUri.toString();
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await SharePlus.instance.share(
+        ShareParams(
+          uri: shareUri,
+          title: 'Share SpaceJunk view',
+          subject: 'SpaceJunk',
+        ),
+      );
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: shareUrl));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Share link copied'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF101820),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
   // 3D ROTATION HELPER (shared with painter)
   // ------------------------------------------------------------------
   static void _rotate3(
@@ -611,6 +676,23 @@ class _HomeScreenState extends State<HomeScreen>
       top: MediaQuery.of(context).padding.top + 16,
       right: 8,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
+        // Share button
+        Tooltip(
+          message: 'Share this view',
+          child: GestureDetector(
+            onTap: _shareLink,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Icon(Icons.ios_share_rounded, color: Colors.white.withValues(alpha: 0.5), size: 20),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         // Time button
         GestureDetector(
           onTap: _toggleTimeSlider,
