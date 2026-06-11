@@ -758,7 +758,11 @@ class _HomeScreenState extends State<HomeScreen>
         children: List.generate(pills.length, (i) {
           final id = pills[i].id;
           final color = pills[i].color;
-          final isVisible = _visibleShells.contains(id);
+
+          // Check if any particles in this shell are visible after constellation filters
+          final hasVisibleObjects = _displayParticles.any((p) => p.shell == id);
+
+          final isVisible = _visibleShells.contains(id) && hasVisibleObjects;
           return Padding(
             padding: const EdgeInsets.only(bottom: 5),
             child: GestureDetector(
