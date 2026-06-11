@@ -13,6 +13,7 @@ library;
 
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'sgp4.dart';
 import '../models/debris_data.dart';
@@ -143,12 +144,18 @@ class CelestrakService {
   CelestrakFetchResult? get lastResult => _lastResult;
   DateTime? get lastFetch => _lastFetch;
 
+  /// Max time to spend trying Celestrak before falling back.
+  static const Duration _globalTimeout = Duration(seconds: 15);
+
+  /// Per-group timeout for Celestrak HTTP calls.
+  static const Duration _groupTimeout = Duration(seconds: 5);
+
   /// Fetch orbital data, trying CelesTrak directly first, then the
   /// self-hosted cache, then falling back to procedural data.
   ///
   /// Sources tried in order:
   ///   1. CelesTrak direct + CORS proxies (client-initiated, live data)
-  ///   2. /api/tle.json (self-hosted fallback, always reachable)
+  ///   2. /api/tle.json (self-hosted cache, web only)
   ///   3. Caller falls back to procedural data
   Future<CelestrakFetchResult> fetch({
     List<String>? groups,
@@ -166,45 +173,48 @@ class CelestrakService {
     _state = CelestrakState.loading;
     _error = null;
 
-    // Try Celestrak directly first (client-initiated, live data).
-    // If the client IP isn't blocked, this gives us the freshest data.
+    // Try Celestrak directly (client-initiated, live data).
+    // Global timeout so we don't hang forever on mobile.
     try {
-      final result = await _fetchFromCelestrak(groups);
+      final result = await _fetchFromCelestrak(groups)
+          .timeout(_globalTimeout);
       _lastResult = result;
       _lastFetch = DateTime.now();
       _state = CelestrakState.loaded;
       return result;
     } catch (_) {
-      // Celestrak unreachable — fall through to self-hosted cache
+      // Celestrak unreachable — fall through
     }
 
-    // Fall back to the self-hosted cache (same-origin, always reachable).
-    // Bundled at CI build time, refreshed by server cron every 30 min.
-    try {
-      final cacheResult = await _fetchFromCache();
-      if (cacheResult != null && cacheResult.objects.isNotEmpty) {
-        cacheResult.dataSource = 'cache';
-        _lastResult = cacheResult;
-        _lastFetch = DateTime.now();
-        _state = CelestrakState.loaded;
-        return cacheResult;
+    // Fall back to the self-hosted cache (bundled at CI build time).
+    // Only makes sense on web where the app is served from a domain.
+    if (kIsWeb) {
+      try {
+        final cacheResult = await _fetchFromCache();
+        if (cacheResult != null && cacheResult.objects.isNotEmpty) {
+          cacheResult.dataSource = 'cache';
+          _lastResult = cacheResult;
+          _lastFetch = DateTime.now();
+          _state = CelestrakState.loaded;
+          return cacheResult;
+        }
+      } catch (_) {
+        // Cache unavailable — fall through to error
       }
-    } catch (_) {
-      // Cache unavailable — fall through to error
     }
 
-    // Neither Celestrak nor cache worked
+    // Nothing worked — caller will use procedural fallback
     _state = CelestrakState.error;
-    _error = 'Live data unavailable — all sources failed';
+    _error = 'Live data unavailable — showing simulated orbits';
     throw CelestrakException('No data from Celestrak or cache');
   }
 
-  /// Fetch from the same-origin cached TLE endpoint.
+  /// Fetch from the same-origin cached TLE endpoint (web only).
   Future<CelestrakFetchResult?> _fetchFromCache() async {
     try {
       final response = await http
           .get(Uri.parse(_selfHostedUrl))
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode != 200) return null;
 
@@ -225,41 +235,25 @@ class CelestrakService {
   }
 
   /// Fetch from CelesTrak group endpoints (direct + CORS proxies).
+  /// Tries groups concurrently and returns on the first successful one,
+  /// so we get data as fast as possible.
   Future<CelestrakFetchResult> _fetchFromCelestrak(
       List<String> groups) async {
+    // Try groups concurrently, complete on first success
+    final results = await Future.wait(
+      groups.map((group) => _fetchSingleGroup(group)),
+      eagerError: false,
+    );
+
     final allObjects = <CelestrakObject>[];
     final seenIds = <int>{};
 
-    for (final group in groups) {
-      try {
-        final url = '$_baseUrl?GROUP=$group&FORMAT=json';
-        http.Response response;
-
-        // Try direct fetch first
-        try {
-          response = await http.get(Uri.parse(url)).timeout(
-            const Duration(seconds: 10),
-          );
-        } catch (_) {
-          response = await _fetchWithProxies(url);
+    for (final result in results) {
+      if (result == null) continue;
+      for (final obj in result) {
+        if (seenIds.add(obj.noradId)) {
+          allObjects.add(obj);
         }
-
-        if (response.statusCode != 200) {
-          response = await _fetchWithProxies(url);
-        }
-
-        if (response.statusCode != 200) continue;
-
-        final List<dynamic> jsonList = json.decode(response.body);
-        for (final item in jsonList) {
-          final obj =
-              CelestrakObject.fromJson(item as Map<String, dynamic>);
-          if (seenIds.add(obj.noradId)) {
-            allObjects.add(obj);
-          }
-        }
-      } catch (e) {
-        continue;
       }
     }
 
@@ -268,6 +262,34 @@ class CelestrakService {
     }
 
     return _processObjects(allObjects);
+  }
+
+  /// Fetch a single group, returning its objects or null on failure.
+  Future<List<CelestrakObject>?> _fetchSingleGroup(String group) async {
+    try {
+      final url = '$_baseUrl?GROUP=$group&FORMAT=json';
+
+      http.Response response;
+      try {
+        response = await http.get(Uri.parse(url))
+            .timeout(_groupTimeout);
+      } catch (_) {
+        response = await _fetchWithProxies(url);
+      }
+
+      if (response.statusCode != 200) {
+        response = await _fetchWithProxies(url);
+      }
+
+      if (response.statusCode != 200) return null;
+
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList
+          .map((item) => CelestrakObject.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Process CelesTrak objects into SGP4 propagators and DebrisParticles.
