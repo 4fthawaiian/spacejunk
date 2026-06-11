@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/debris_data.dart';
 import '../models/satcat_record.dart';
 import '../painters/space_debris_painter.dart';
@@ -63,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _lastUpdate = '';
   String _fetchError = '';
   bool _showControlsHint = true;
+bool _hasSeenInfo = false; // track whether the info dialog was shown
 
   // ---- Time slider (historical view) ----
   double _historicalOffsetDays = 0.0; // days  -365..+365
@@ -80,6 +82,20 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    // Load persisted flag
+    SharedPreferences.getInstance().then((prefs) {
+      setState(() {
+        _hasSeenInfo = prefs.getBool('hasSeenInfo') ?? false;
+      });
+      if (!_hasSeenInfo) {
+        // Show dialog on first visit
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && context != null) {
+            _showInfoDialog();
+          }
+        });
+      }
+    });
     _allParticles = DebrisGenerator.generate();
     _propagators = [];
     _celestrakObjects = [];
