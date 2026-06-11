@@ -62,7 +62,7 @@
 - [x] Bundle favicon/apple-touch-icon for site — new flame favicon + PWA icons + maskable variants
 - [x] Custom app icon design extracted from artwork and deployed to Android & web
 - [x] Multi-platform icon set — Android (5 densities), web (favicon, PWA 192/512, maskable), apple-touch-icon
-- [ ] Add `spacejunk.4ft.me` sitemap / SEO meta
+- [x] Add `spacejunk.4ft.me` sitemap / SEO meta
 - [ ] WASM build via GitHub Action for better perf
 - [ ] Health check endpoint monitoring
 - [ ] Staging branch with preview deploys
