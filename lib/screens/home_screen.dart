@@ -74,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen>
     final geoC = _allParticles.where((p) => p.shell == 'GEO').length;
     final debC = _allParticles.where((p) => p.shell == 'Debris').length;
     final stnC = _allParticles.where((p) => p.shell == 'Station').length;
-    debugPrint('TRASHMAP: ${_allParticles.length} particles (LEO: $leoC, MEO: $meoC, GEO: $geoC, Debris: $debC, Station: $stnC)');
+    debugPrint('SpaceJunk: ${_allParticles.length} particles (LEO: $leoC, MEO: $meoC, GEO: $geoC, Debris: $debC, Station: $stnC)');
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 60),
@@ -481,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen>
             shaderCallback: (b) => const LinearGradient(
               colors: [Color(0xFFFF6B35), Color(0xFFF7C948)],
             ).createShader(b),
-            child: const Text('✦ TRASHMAP',
+            child: const Text('✦ SPACEJUNK',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 2)),
           ),
           Text('Space Debris Visualization',
@@ -1007,7 +1007,7 @@ class _HomeScreenState extends State<HomeScreen>
                       style: TextStyle(color: const Color(0xFF4FC3F7).withValues(alpha: 0.7), fontWeight: FontWeight.w700, fontSize: 16))),
                   ),
                   const SizedBox(width: 12),
-                  const Text('TrashMap',
+                  const Text('SpaceJunk',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1)),
                   const Spacer(),
                   GestureDetector(
@@ -1018,7 +1018,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 16),
                 _infoSection(
                   'What is this?',
-                  'TrashMap visualises the orbital debris environment around Earth in 3D. '
+                  'SpaceJunk visualises the orbital debris environment around Earth in 3D. '
                   'Hundreds of thousands of human-made objects — defunct satellites, rocket bodies, '
                   'collision fragments, and active spacecraft — orbit our planet at speeds up to '
                   '28,000 km/h, creating an ever-growing shell of space junk.',
@@ -1039,7 +1039,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 14),
                 _infoSection(
                   'Live Tracked Objects',
-                  'TrashMap fetches orbital data from CelesTrak, a real-time repository of TLE '
+                  'SpaceJunk fetches orbital data from CelesTrak, a real-time repository of TLE '
                   '(Two-Line Element) sets maintained by the US Space Force. Each dot represents '
                   'a tracked object propagated via the SGP4 algorithm to its current position. '
                   'New objects are added automatically via the active, stations, visual, amateur, '
@@ -1236,7 +1236,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           Row(children: [
             Icon(Icons.info_outline_rounded, color: const Color(0xFFF7C948).withValues(alpha: 0.8), size: 20),
             const SizedBox(width: 10),
-            Text('About TRASHMAP',
+            Text('About SpaceJunk',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.9), letterSpacing: 1)),
           ]),
           const SizedBox(height: 12),
