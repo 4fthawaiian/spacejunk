@@ -3,9 +3,10 @@
 /// CelesTrak provides TLE (Two-Line Element) data for thousands of
 /// tracked objects in space — satellites, debris, rocket bodies, etc.
 ///
-/// Primary data source: same-origin cache endpoint (/api/tle.json)
-/// bundled at CI build time. Falls back to CelesTrak + CORS proxies,
-/// then to procedural data in the caller.
+/// Data source priority:
+///   1. CelesTrak direct + CORS proxies (client-initiated, live data)
+///   2. /api/tle.json (self-hosted cache, same-origin, always reachable)
+///   3. Procedural simulation in the caller (always works)
 ///
 /// API: https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=json
 library;
@@ -142,11 +143,12 @@ class CelestrakService {
   CelestrakFetchResult? get lastResult => _lastResult;
   DateTime? get lastFetch => _lastFetch;
 
-  /// Fetch orbital data, trying same-origin cache first, then CelesTrak.
+  /// Fetch orbital data, trying CelesTrak directly first, then the
+  /// self-hosted cache, then falling back to procedural data.
   ///
   /// Sources tried in order:
-  ///   1. /api/tle.json (same-origin, bundled at CI build time)
-  ///   2. CelesTrak direct + CORS proxies
+  ///   1. CelesTrak direct + CORS proxies (client-initiated, live data)
+  ///   2. /api/tle.json (self-hosted fallback, always reachable)
   ///   3. Caller falls back to procedural data
   Future<CelestrakFetchResult> fetch({
     List<String>? groups,
@@ -164,7 +166,20 @@ class CelestrakService {
     _state = CelestrakState.loading;
     _error = null;
 
-    // Try the same-origin cache first (bundled snapshot + server cron)
+    // Try Celestrak directly first (client-initiated, live data).
+    // If the client IP isn't blocked, this gives us the freshest data.
+    try {
+      final result = await _fetchFromCelestrak(groups);
+      _lastResult = result;
+      _lastFetch = DateTime.now();
+      _state = CelestrakState.loaded;
+      return result;
+    } catch (_) {
+      // Celestrak unreachable — fall through to self-hosted cache
+    }
+
+    // Fall back to the self-hosted cache (same-origin, always reachable).
+    // Bundled at CI build time, refreshed by server cron every 30 min.
     try {
       final cacheResult = await _fetchFromCache();
       if (cacheResult != null && cacheResult.objects.isNotEmpty) {
@@ -175,21 +190,13 @@ class CelestrakService {
         return cacheResult;
       }
     } catch (_) {
-      // Cache unavailable — fall through to CelesTrak
+      // Cache unavailable — fall through to error
     }
 
-    // Fall back to CelesTrak (direct + CORS proxies)
-    try {
-      final result = await _fetchFromCelestrak(groups);
-      _lastResult = result;
-      _lastFetch = DateTime.now();
-      _state = CelestrakState.loaded;
-      return result;
-    } catch (e) {
-      _state = CelestrakState.error;
-      _error = e.toString();
-      rethrow;
-    }
+    // Neither Celestrak nor cache worked
+    _state = CelestrakState.error;
+    _error = 'Live data unavailable — all sources failed';
+    throw CelestrakException('No data from Celestrak or cache');
   }
 
   /// Fetch from the same-origin cached TLE endpoint.
