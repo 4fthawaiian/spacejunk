@@ -52,7 +52,7 @@ SpaceJunk renders the orbital debris environment around Earth in real-time 3D. H
 ### Run on Android
 
 ```bash
-cd spacejunk
+cd trashmap
 flutter run -d <device-id>
 ```
 
