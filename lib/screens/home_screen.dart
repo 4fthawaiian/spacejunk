@@ -3,7 +3,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../models/debris_data.dart';
+import '../models/satcat_record.dart';
 import '../painters/space_debris_painter.dart';
+import '../utils/country_flags.dart';
 import '../services/celestrak_service.dart';
 import '../services/sgp4.dart';
 
@@ -276,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _onTapUp(TapUpDetails details) {
     final pos = details.localPosition;
     _performHitTest(pos);
+    _lazyLoadSatcatForSelected();
   }
 
   void _performHitTest(Offset tapPos) {
@@ -307,7 +310,10 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (nearest != null) {
-      final name = nearest.name ?? _defaultName(nearest);
+      // SATCAT: embedded particle data first, then on-demand cache
+      final satcat = nearest.satcat ??
+          (nearest.noradId > 0 ? _celestrak.getSatcat(nearest.noradId) : null);
+      final name = satcat?.objectName ?? nearest.name ?? _defaultName(nearest);
       setState(() {
         _selectedParticle = nearest;
         _selectedName = name;
@@ -320,6 +326,26 @@ class _HomeScreenState extends State<HomeScreen>
         _tapPosition = null;
       });
     }
+  }
+
+  /// After a tap, fetch SATCAT metadata on-demand if it wasn't embedded
+  /// in the cache data. Refreshes the popup when it arrives.
+  void _lazyLoadSatcatForSelected() {
+    final p = _selectedParticle;
+    if (p == null || p.noradId <= 0) return;
+    if (p.satcat != null || _celestrak.getSatcat(p.noradId) != null) return;
+
+    _celestrak.fetchSatcatForNorad(p.noradId).then((_) {
+      if (!mounted) return;
+      final current = _selectedParticle;
+      if (current == null || current.noradId != p.noradId) return;
+      setState(() {
+        final satcat = _celestrak.getSatcat(current.noradId);
+        _selectedName = satcat?.objectName ??
+            current.name ??
+            _defaultName(current);
+      });
+    });
   }
 
   String _defaultName(DebrisParticle p) {
@@ -819,12 +845,18 @@ class _HomeScreenState extends State<HomeScreen>
     final pos = _tapPosition!;
     final screenSize = MediaQuery.of(context).size;
 
+    // SATCAT: embedded in particle first, then on-demand cache
+    final satcat = p.satcat ??
+        (p.noradId > 0 ? _celestrak.getSatcat(p.noradId) : null);
+
+    final popupWidth = satcat != null ? 260.0 : 220.0;
+
     // Position popup above the tap point, keeping on screen
-    double left = pos.dx - 110;
-    double top = pos.dy - 120;
+    double left = pos.dx - popupWidth / 2;
+    double top = pos.dy - (satcat != null ? 240 : 120);
     if (left < 10) left = 10;
-    if (left > screenSize.width - 230) left = screenSize.width - 230;
-    if (top < 10) top = pos.dy + 20; // flip below if too high
+    if (left > screenSize.width - popupWidth - 10) left = screenSize.width - popupWidth - 10;
+    if (top < 10) top = pos.dy + 30;
 
     final color = Color(p.color);
     final altStr = p.altitude.toStringAsFixed(0);
@@ -838,7 +870,7 @@ class _HomeScreenState extends State<HomeScreen>
           _tapPosition = null;
         }),
         child: Container(
-          width: 220,
+          width: popupWidth,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: const Color(0xFF0D0D0D).withValues(alpha: 0.92),
@@ -868,21 +900,140 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ]),
             const SizedBox(height: 10),
-            // Details
+
+            // ── SATCAT metadata (rich) ──
+            if (satcat != null) ...[
+              _metadataFlagRow(satcat),
+              const SizedBox(height: 6),
+              _metadataRow(Icons.rocket_launch_rounded, 'Launched',
+                  satcat.launchDate.isNotEmpty ? satcat.launchDate : 'Unknown'),
+              _typeBadge(satcat.objectType, satcat.objectTypeLabel),
+              if (satcat.rcs != null)
+                _metadataRow(Icons.line_weight_rounded, 'RCS', satcat.rcsLabel),
+              if (satcat.decayDate.isNotEmpty)
+                _metadataRow(Icons.cloud_off_rounded, 'Decayed', satcat.decayDate),
+              const SizedBox(height: 4),
+            ],
+
+            // ── Common details ──
             _popupRow('Orbit', p.shell),
             _popupRow('Altitude', '$altStr km'),
             _popupRow('Data source',
+              satcat != null ? 'CelesTrak' :
               _dataSource == 'live' ? 'CelesTrak (live)' :
               _dataSource == 'cache' ? 'CelesTrak (cached)' : 'Simulation'),
+            if (satcat != null && satcat.noradCatId > 0)
+              _popupRow('NORAD ID', '#${satcat.noradCatId}'),
+            if (satcat != null && satcat.objectId.isNotEmpty)
+              _popupRow('COSPAR ID', satcat.objectId),
             if (_historicalOffsetDays != 0.0)
               _popupRow('Viewing', _formatDate(_historicalOffsetDays)),
-            // Footer hint
+
             const SizedBox(height: 6),
             Text('Tap to close',
               style: TextStyle(fontSize: 8, color: Colors.white.withValues(alpha: 0.2), letterSpacing: 1)),
           ]),
         ),
       ),
+    );
+  }
+
+  /// Row showing flag emoji + country name.
+  Widget _metadataFlagRow(SatcatRecord satcat) {
+    final info = lookupOwner(satcat.owner);
+    return Row(children: [
+      Text(info.flag, style: const TextStyle(fontSize: 20)),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(info.name,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: satcat.isOperational
+              ? const Color(0xFF4CAF50).withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: satcat.isOperational
+                ? const Color(0xFF4CAF50).withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Text(
+          satcat.isOperational ? 'ACTIVE' :
+          satcat.decayDate.isNotEmpty ? 'DECAYED' :
+          'INACTIVE',
+          style: TextStyle(
+            fontSize: 7,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.5,
+            color: satcat.isOperational
+                ? const Color(0xFF4CAF50).withValues(alpha: 0.8)
+                : Colors.white.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  /// A row with a small leading icon.
+  Widget _metadataRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
+        Icon(icon, size: 12, color: Colors.white.withValues(alpha: 0.25)),
+        const SizedBox(width: 6),
+        Text(label,
+          style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.35), letterSpacing: 1)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(value,
+            style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+            textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ]),
+    );
+  }
+
+  /// Coloured badge for object type.
+  Widget _typeBadge(String objectType, String label) {
+    final typeColor = switch (objectType) {
+      'PAY' => const Color(0xFF4FC3F7),
+      'R/B' => const Color(0xFFFFAB40),
+      'DEB' => const Color(0xFFEF5350),
+      _   => Colors.white.withValues(alpha: 0.3),
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(children: [
+        Icon(Icons.category_rounded, size: 12, color: Colors.white.withValues(alpha: 0.25)),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: typeColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: typeColor.withValues(alpha: 0.25)),
+          ),
+          child: Text(label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
+              color: typeColor.withValues(alpha: 0.85),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 

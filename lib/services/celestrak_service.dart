@@ -17,6 +17,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'sgp4.dart';
 import '../models/debris_data.dart';
+import '../models/satcat_record.dart';
 
 /// Orbital data for a single object from CelesTrak.
 class CelestrakObject {
@@ -33,6 +34,9 @@ class CelestrakObject {
   final double bstar;
   final String objectType; // inferred
 
+  /// SATCAT metadata, embedded when served from the self-hosted cache.
+  final SatcatRecord? satcat;
+
   CelestrakObject({
     required this.name,
     required this.noradId,
@@ -46,9 +50,14 @@ class CelestrakObject {
     required this.meanAnomaly,
     required this.bstar,
     required this.objectType,
+    this.satcat,
   });
 
-  /// Parse from CelesTrak JSON object.
+  /// Parse from CelesTrak JSON (or enriched cache JSON).
+  ///
+  /// When the JSON includes a nested "satcat" object (from the self-hosted
+  /// cache), it is parsed into a [SatcatRecord]. Direct CelesTrak responses
+  /// lack this field and [satcat] will be null.
   factory CelestrakObject.fromJson(Map<String, dynamic> json) {
     final name = json['OBJECT_NAME'] as String? ?? 'Unknown';
     final noradId = json['NORAD_CAT_ID'] as int? ?? 0;
@@ -60,8 +69,17 @@ class CelestrakObject {
       type = 'debris';
     } else if (upper.contains('R/B') || upper.contains('ROCKET')) {
       type = 'rocket_body';
-    } else if (upper.contains('ISS') || upper.contains('TIANHE') || upper.contains('NAUKA') || upper.contains('CSS')) {
+    } else if (upper.contains('ISS') || upper.contains('TIANHE') ||
+        upper.contains('NAUKA') || upper.contains('CSS')) {
       type = 'station';
+    }
+
+    // Parse embedded SATCAT metadata if present (from self-hosted cache)
+    SatcatRecord? satcat;
+    if (json['satcat'] is Map<String, dynamic>) {
+      satcat = SatcatRecord.fromJson(
+        json['satcat'] as Map<String, dynamic>,
+      );
     }
 
     return CelestrakObject(
@@ -77,6 +95,7 @@ class CelestrakObject {
       meanAnomaly: (json['MEAN_ANOMALY'] as num?)?.toDouble() ?? 0,
       bstar: (json['BSTAR'] as num?)?.toDouble() ?? 0,
       objectType: type,
+      satcat: satcat,
     );
   }
 }
@@ -375,6 +394,8 @@ class CelestrakService {
           color: color,
           size: size * (0.7 + Random(obj.noradId).nextDouble() * 0.6),
           name: obj.name,
+          noradId: obj.noradId,
+          satcat: obj.satcat,
         ));
       } catch (e) {
         // Skip objects that fail to propagate
@@ -418,6 +439,62 @@ class CelestrakService {
         return 1.0;
       default:
         return 0.7;
+    }
+  }
+
+  // ── SATCAT metadata (on-demand fallback) ──────────────────────────────
+
+  /// In-memory cache for SATCAT records fetched on-demand.
+  static final Map<int, SatcatRecord> _satcatCache = {};
+  static final Set<int> _satcatLoading = {};
+
+  /// Look up SATCAT metadata for a NORAD ID.
+  ///
+  /// Returns the record from:
+  ///   1. The current result's [DebrisParticle.satcat] if populated
+  ///   2. The on-demand cache (from a previous [fetchSatcatForNorad] call)
+  ///   3. null if unavailable
+  SatcatRecord? getSatcat(int noradId) => _satcatCache[noradId];
+
+  /// Fetch SATCAT metadata for a single NORAD ID on-demand.
+  ///
+  /// Results are cached in memory. This is a fallback when the self-hosted
+  /// cache hasn't been enriched with SATCAT data yet.
+  Future<SatcatRecord?> fetchSatcatForNorad(int noradId) async {
+    if (_satcatCache.containsKey(noradId)) return _satcatCache[noradId];
+    if (_satcatLoading.contains(noradId)) return null;
+
+    _satcatLoading.add(noradId);
+    try {
+      final url =
+          'https://celestrak.org/satcat/records.php?CATNR=$noradId&FORMAT=JSON';
+      http.Response response;
+
+      try {
+        response = await http.get(Uri.parse(url)).timeout(
+          const Duration(seconds: 10),
+        );
+      } catch (_) {
+        response = await _fetchWithProxies(url);
+      }
+
+      if (response.statusCode != 200) {
+        response = await _fetchWithProxies(url);
+      }
+      if (response.statusCode != 200) return null;
+
+      final List<dynamic> jsonList = json.decode(response.body);
+      if (jsonList.isEmpty) return null;
+
+      final record = SatcatRecord.fromJson(
+        jsonList[0] as Map<String, dynamic>,
+      );
+      _satcatCache[noradId] = record;
+      return record;
+    } catch (_) {
+      return null;
+    } finally {
+      _satcatLoading.remove(noradId);
     }
   }
 
