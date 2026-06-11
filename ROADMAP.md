@@ -41,8 +41,13 @@
 - [ ] Remove "Data source" row from popup info cards (always CelesTrak for live data)
 
 ### Data & Reality
-- [ ] Full catalog — add more CelesTrak groups for thousands more tracked objects
-- [ ] Periodic auto-refresh — re-fetch live data every 30 min automatically
+- [x] Full catalog — 15k+ tracked objects across 14 CelesTrak groups
+- [x] Periodic auto-refresh — server cron refreshes cached TLE snapshot every 30 min
+- [x] Self-hosted TLE cache — build-time snapshot + nginx proxy with stale-while-revalidate
+- [x] Multi-source fallback chain (client → Celestrak → self-hosted cache → procedural)
+- [x] Concurrent group fetching — groups tried in parallel for fast fallback (~15s max)
+- [x] Platform-aware data fetching — cache skipped on mobile (where /api/tle.json doesn't apply)
+- [x] Removed invalid "rocket-body" CelesTrak group
 - [ ] Collision event overlays — mark known historical satellite collisions
 - [ ] Distinguish live tracked objects from procedural in the view
 - [ ] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info on tap popup (branch: satcat-enrichment)
@@ -63,6 +68,9 @@
 - [x] Custom app icon design extracted from artwork and deployed to Android & web
 - [x] Multi-platform icon set — Android (5 densities), web (favicon, PWA 192/512, maskable), apple-touch-icon
 - [x] Add `spacejunk.4ft.me` sitemap / SEO meta
+- [x] Self-hosted TLE cache — nginx proxy_cache to Celestrak with stale-while-revalidate
+- [x] Server cron — Python script fetches + deduplicates TLE groups every 30 min
+- [x] CI build-time TLE snapshot — `scripts/fetch-tle.mjs` bundles data with every deploy
 - [ ] WASM build via GitHub Action for better perf
 - [ ] Health check endpoint monitoring
 - [ ] Staging branch with preview deploys
