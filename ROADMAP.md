@@ -27,7 +27,7 @@
 - [x] WebAssembly/CanvasKit build support (`flutter build web --wasm`)
 - [x] Live site at https://junk.4ft.me — nginx vhost, Let's Encrypt SSL, SPA routing
 - [x] Auto-deploy pipeline — GitHub Action builds web + rsyncs to server on every push to main
-- [x] Desktop/tablet UI scaling — 150% zoom via SizedBox + MediaQuery + Transform.scale on screens >=600px
+- [x] Desktop/tablet UI scaling — 150% zoom via SizedBox + MediaQuery + Transform.scale on screens >=600px (fixed: uses shortestSide to avoid scaling on phones in landscape)
 - [x] Mouse wheel / trackpad scroll zoom for desktop web — scroll up zooms in, down zooms out
 - [x] Constellation filtering — identify satellites by group (Starlink, OneWeb, GPS, Iridium, etc.) with per-group toggles, counts, and isolation mode
 - [x] URL query parameter support — `?constellations=starlink,gps&hideShells=Debris&zoom=1.5&time=-30` for screenshot/embed/social previews

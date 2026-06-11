@@ -25,7 +25,9 @@ class TrashMapApp extends StatelessWidget {
       ),
       builder: (context, child) {
         final size = MediaQuery.of(context).size;
-        final isDesktop = size.width >= 600;
+        // Use shortestSide to differentiate true desktop/tablet from mobile devices
+        // This prevents applying the desktop scale on phones in landscape mode.
+        final isDesktop = size.shortestSide >= 600;
         if (isDesktop) {
           return Center(
             child: Transform.scale(
