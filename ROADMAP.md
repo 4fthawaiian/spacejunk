@@ -49,8 +49,8 @@
 - [x] Platform-aware data fetching — cache skipped on mobile (where /api/tle.json doesn't apply)
 - [x] Removed invalid "rocket-body" CelesTrak group
 - [ ] Collision event overlays — mark known historical satellite collisions
+- [x] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info embedded in self-hosted cache + on-demand fallback
 - [ ] Distinguish live tracked objects from procedural in the view
-- [ ] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info on tap popup (branch: satcat-enrichment)
 
 ### Performance
 - [ ] GPU batching for higher particle counts
@@ -62,6 +62,10 @@
 - [ ] Megaconstellation visualization (Starlink, OneWeb, Kuiper)
 - [ ] Spacecraft debris avoidance maneuvers
 - [ ] Kessler syndrome simulation (cascade effect)
+
+### Filtering & Discovery
+- [ ] Filtering UI — filter debris cloud by country of origin, object type (payload/rocket body/debris), RCS range, launch date range
+- [ ] Batch SATCAT pre-fetch — load SATCAT for all visible NORAD IDs at GP-fetch time to enable instant filtering
 
 ### Infrastructure & Ops
 - [x] Bundle favicon/apple-touch-icon for site — new flame favicon + PWA icons + maskable variants

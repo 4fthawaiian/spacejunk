@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * fetch-tle.mjs — Fetches TLE orbital data from CelesTrak and writes merged JSON.
+ * fetch-tle.mjs — Fetches TLE + SATCAT data from CelesTrak and writes enriched JSON.
  *
  * Used in CI/CD to bundle a live TLE snapshot with the app at build time,
  * so the app always has data even if CelesTrak is unreachable from the client.
+ * Each TLE object gains a "satcat" field with country, launch date, type, RCS, etc.
  *
  * Usage:
  *   node scripts/fetch-tle.mjs                         # stdout
@@ -14,6 +15,7 @@
  */
 
 const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
+const SATCAT_CSV_URL = 'https://celestrak.org/pub/satcat.csv';
 const DEFAULT_GROUPS = [
   'stations',
   'visual',
@@ -24,6 +26,18 @@ const DEFAULT_GROUPS = [
   'science',
   'geo',
   'gps-ops',
+];
+
+// SATCAT fields to embed into each TLE object.
+const SATCAT_FIELDS = [
+  'OWNER',
+  'LAUNCH_DATE',
+  'OBJECT_TYPE',
+  'OPS_STATUS_CODE',
+  'RCS',
+  'LAUNCH_SITE',
+  'DECAY_DATE',
+  'ORBIT_TYPE',
 ];
 
 function usage() {
@@ -94,6 +108,119 @@ function mergeGroups(arrays) {
   return merged;
 }
 
+/**
+ * Download and parse the SATCAT CSV, return a Map<NORAD_CAT_ID, satcat_fields>.
+ */
+async function loadSatcat() {
+  console.error(`\n📖 Loading SATCAT catalog from ${SATCAT_CSV_URL}...`);
+
+  let csvText;
+  try {
+    const res = await fetch(SATCAT_CSV_URL, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) {
+      console.error(`  ⚠ SATCAT: HTTP ${res.status}`);
+      return new Map();
+    }
+    csvText = await res.text();
+  } catch (err) {
+    console.error(`  ✗ SATCAT: ${err.message}`);
+    return new Map();
+  }
+
+  const map = new Map();
+  const lines = csvText.split('\n');
+  if (lines.length < 2) return map;
+
+  // Parse header
+  const header = parseCsvLine(lines[0]);
+  const fieldIndices = {};
+  for (let i = 0; i < header.length; i++) {
+    fieldIndices[header[i]] = i;
+  }
+
+  let count = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    try {
+      const fields = parseCsvLine(line);
+      const noradIdx = fieldIndices['NORAD_CAT_ID'];
+      if (noradIdx == null || noradIdx >= fields.length) continue;
+      const norad = parseInt(fields[noradIdx], 10);
+      if (!norad || norad <= 0) continue;
+
+      const satcat = {};
+      for (const key of SATCAT_FIELDS) {
+        const idx = fieldIndices[key];
+        if (idx != null && idx < fields.length) {
+          let val = fields[idx] || '';
+          if (key === 'RCS' && val) {
+            const num = parseFloat(val);
+            if (!isNaN(num)) val = num;
+          }
+          satcat[key] = val;
+        }
+      }
+      map.set(norad, satcat);
+      count++;
+    } catch (_) {
+      // skip malformed lines
+    }
+  }
+
+  console.error(`  ✓ ${count} SATCAT records loaded`);
+  return map;
+}
+
+/** Simple RFC 4180 CSV line parser. */
+function parseCsvLine(line) {
+  const result = [];
+  let buf = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          buf += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        buf += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(buf.trim());
+        buf = '';
+      } else {
+        buf += ch;
+      }
+    }
+  }
+  result.push(buf.trim());
+  return result;
+}
+
+/** Embed SATCAT metadata into merged TLE objects. */
+function enrichWithSatcat(objects, satcatMap) {
+  let enriched = 0;
+  for (const obj of objects) {
+    const id = obj.NORAD_CAT_ID;
+    if (id && satcatMap.has(id)) {
+      obj.satcat = satcatMap.get(id);
+      enriched++;
+    }
+  }
+  console.error(`  ✓ Enriched ${enriched}/${objects.length} objects with SATCAT metadata`);
+  return objects;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   let outputPath = null;
@@ -138,6 +265,14 @@ async function main() {
   console.error(`\n📊 Summary:`);
   console.error(`   Fetched: ${totalFetched} objects across ${groups.length} groups`);
   console.error(`   After dedup: ${merged.length} unique objects`);
+
+  // Enrich with SATCAT metadata
+  if (merged.length > 0) {
+    const satcatMap = await loadSatcat();
+    if (satcatMap.size > 0) {
+      enrichWithSatcat(merged, satcatMap);
+    }
+  }
 
   const json = JSON.stringify(merged, null, 2);
 

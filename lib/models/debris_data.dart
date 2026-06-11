@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'satcat_record.dart';
+
 /// Represents a single piece of space debris with orbital parameters.
 class DebrisParticle {
   final double x, y, z; // Cartesian position (scaled)
@@ -8,6 +10,12 @@ class DebrisParticle {
   final int color; // ARGB color
   final double size; // visual size
   final String? name; // Real-world name (from CelesTrak) or null
+
+  /// NORAD catalog ID, 0 for procedural particles.
+  final int noradId;
+
+  /// Rich SATCAT metadata, set when served from the self-hosted cache.
+  final SatcatRecord? satcat;
 
   DebrisParticle({
     required this.x,
@@ -18,6 +26,8 @@ class DebrisParticle {
     required this.color,
     required this.size,
     this.name,
+    this.noradId = 0,
+    this.satcat,
   });
 }
 
