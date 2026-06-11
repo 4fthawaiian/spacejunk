@@ -31,6 +31,7 @@
 - [x] Mouse wheel / trackpad scroll zoom for desktop web — scroll up zooms in, down zooms out
 - [x] Constellation filtering — identify satellites by group (Starlink, OneWeb, GPS, Iridium, etc.) with per-group toggles, counts, and isolation mode
 - [x] URL query parameter support — `?constellations=starlink,gps&hideShells=Debris&zoom=1.5&time=-30` for screenshot/embed/social previews
+- [x] Shareable view links — top-level share button builds canonical web URLs from current filters, zoom, and time; Android opens the native share sheet
 - [x] Self-hosted TLE cache priority — cache-first fetch with SATCAT enrichment, CelesTrak direct as fallback
 
 
