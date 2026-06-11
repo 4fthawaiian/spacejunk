@@ -31,6 +31,19 @@
 - [x] Mouse wheel / trackpad scroll zoom for desktop web — scroll up zooms in, down zooms out
 
 
+## 🚧 Cooldown (CelesTrak rate-limit, ~2026-06-11 to 06-13)
+- Server IP blocked by CelesTrak — no TLE fetches from prod until it lifts
+- Cache static at 15,834 objects (12MB, all SATCAT-enriched) — fresh enough for 48h
+- Cron at 30min hammered CelesTrak — lesson learned: use 6h interval going forward
+- GH Action TLE fetch disabled (`if: false`) during cooldown
+- $0.26 DO droplet used for one-off full-cache grab — documented in AGENTS.md
+- `--exclude=api/` added to all rsync commands to protect prod cache
+
+### To re-enable after cooldown
+- Re-enable cron on server.4ft.me with 6h interval (not 30min!)
+- Un-skip the TLE fetch step in `.github/workflows/deploy-web.yml`
+- Remove `--exclude=api/` from GH Action rsync (or keep it, cache pushes via separate scp)
+
 ## 🎯 Up Next
 
 ### Polish & UX
@@ -41,15 +54,19 @@
 - [ ] Remove "Data source" row from popup info cards (always CelesTrak for live data)
 
 ### Data & Reality
-- [x] Full catalog — 15k+ tracked objects across 14 CelesTrak groups
-- [x] Periodic auto-refresh — server cron refreshes cached TLE snapshot every 30 min
+- [x] Full catalog — 15,834 tracked objects across 14 CelesTrak groups (cache-first priority)
+- [x] Periodic auto-refresh — server cron refreshes cached TLE snapshot (disabled during cooldown, 6h interval when re-enabled)
 - [x] Self-hosted TLE cache — build-time snapshot + nginx proxy with stale-while-revalidate
-- [x] Multi-source fallback chain (client → Celestrak → self-hosted cache → procedural)
+- [x] Multi-source fallback chain (cache-first → Celestrak → procedural)
 - [x] Concurrent group fetching — groups tried in parallel for fast fallback (~15s max)
 - [x] Platform-aware data fetching — cache skipped on mobile (where /api/tle.json doesn't apply)
 - [x] Removed invalid "rocket-body" CelesTrak group
+- [x] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info
+- [x] Fixed type error in SATCAT RCS parsing (empty string → null)
+- [x] `--exclude=api/` everywhere — protects prod cache from rsync --delete nuking it
+- [x] Test site nginx — added /api/tle.json location block
+- [x] gh-pages deploy script patched — --exclude=api/ added
 - [ ] Collision event overlays — mark known historical satellite collisions
-- [x] SATCAT metadata enrichment — country flags, launch dates, object types, RCS, decay info embedded in self-hosted cache + on-demand fallback
 - [ ] Distinguish live tracked objects from procedural in the view
 
 ### Performance

@@ -12,20 +12,23 @@ jobs:
           channel: stable
       - run: flutter build web --release
 
-      # Fetch TLE snapshot from CelesTrak and bundle with the app.
-      # This ensures the app always has live data even if CelesTrak
-      # is unreachable from the client. Falls back gracefully if
-      # the fetch fails (CI runner might also be rate-limited).
-      - name: Fetch TLE snapshot
+      # TLE fetch is skipped during CelesTrak cooldown (server IP blocked until ~2026-06-13).
+      # The server has a static 15,834-object cache. When cooldown ends, remove the
+      # 'if: false' below and the --exclude=api/ in the rsync ARGS to resume live fetching.
+      - name: Fetch TLE snapshot (SKIPPED during cooldown)
+        if: false
         run: |
           mkdir -p build/web/api
-          node scripts/fetch-tle.mjs --output build/web/api/tle.json --timeout 20 || \
-            echo '⚠ TLE fetch failed (CI runner may be rate-limited) — app will use procedural fallback'
+          node scripts/fetch-tle.mjs --output build/web/api/tle.json --timeout 20 || {
+            rm -f build/web/api/tle.json
+            echo '⚠ TLE fetch failed — server keeps its existing cache'
+          }
 
       - uses: easingthemes/ssh-deploy@main
         with:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_KEY }}
-          ARGS: "-avz --delete"
+          # --exclude=api/ prevents --delete from wiping the server's cached TLE snapshot
+          ARGS: "-avz --delete --exclude=api/"
           SOURCE: "build/web/"
           REMOTE_HOST: "server.4ft.me"
           REMOTE_USER: "root"

@@ -4,6 +4,13 @@
 set -e
 cd "$(dirname "$0")"
 
+echo "=== Fetching TLE snapshot for build-time cache ==="
+mkdir -p build/web/api
+node scripts/fetch-tle.mjs --output build/web/api/tle.json --timeout 30 || {
+    rm -f build/web/api/tle.json
+    echo "  ⚠ TLE fetch failed — removed empty cache so nginx proxy can serve"
+}
+
 echo "=== Building web release ==="
 flutter build web --release
 
