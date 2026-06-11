@@ -13,6 +13,10 @@
   <img alt="Debris count" src="https://img.shields.io/badge/particles-~15,800-orange?style=flat-square">
 </p>
 
+<p align="center">
+  <b><a href="https://junk.4ft.me">➜ See it live → junk.4ft.me</a></b>
+</p>
+
 ---
 
 TrashMap renders the orbital debris environment around Earth in real-time 3D. Hundreds of thousands of human-made objects — defunct satellites, rocket bodies, collision fragments, and active spacecraft — orbit our planet at speeds up to 28,000 km/h. This app visualises them all in a single interactive view.
