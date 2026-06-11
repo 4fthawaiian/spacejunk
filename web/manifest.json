@@ -1,11 +1,11 @@
 {
-    "name": "TRASHMAP — Space Debris Visualizer",
-    "short_name": "TRASHMAP",
+    "name": "SpaceJunk — 3D Space Debris Visualizer",
+    "short_name": "SpaceJunk",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#000000",
-    "description": "Real-time 3D visualization of space debris orbiting Earth — LEO, MEO, GEO and tracked debris.",
+    "description": "Interactive 3D visualization of space debris orbiting Earth — live CelesTrak data, SGP4 propagation, and procedural debris across LEO, MEO, GEO, and more.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
