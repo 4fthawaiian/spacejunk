@@ -32,6 +32,7 @@ SpaceJunk renders the orbital debris environment around Earth in real-time 3D. H
 - **Historical scrubber** — slide through time (±1 year) with play/pause to watch orbital evolution
 - **Filter panel** — toggle individual shells, show/hide starfield, all with tactile Cupertino-style switches
 - **Quick-access pills** — one-tap shell toggles anchored to the left of the viewport
+- **Constellation filter** — isolate satellites by group (Starlink, OneWeb, GPS, Iridium, etc.) with per-group toggles and object counts
 - **Station markers** — gold crosshair+ring markers for crewed outposts (ISS, Tiangong)
 - **Info dialog** — learn about orbital shells, data sources, and the space debris problem
 
@@ -75,10 +76,11 @@ flutter build web --release --wasm
 
 Serve the `build/web` directory via any static file server (GitHub Pages, Vercel, Netlify, etc.).
 
-> **CORS note:** CelesTrak does not send CORS headers, so the web build automatically falls
-> back to a chain of public CORS proxies (`corsproxy.io`, `allorigins.win`, `corsproxy.org`).
-> If the live fetch fails, the app gracefully falls back to procedurally-generated data.
-> Android/iOS builds fetch directly without issues.
+> **Data sources (priority order):** 1) CelesTrak direct + CORS proxies (client-side),
+> 2) self-hosted TLE cache at `/api/tle.json` (same-origin, web only),
+> 3) procedural simulation (always works). The self-hosted cache is refreshed periodically
+> from CelesTrak and includes SATCAT metadata for enriched tap popups.
+> Android/iOS builds skip the cache and fetch directly.
 
 ## 🧭 Orbital Shells
 
@@ -97,14 +99,19 @@ Serve the `build/web` directory via any static file server (GitHub Pages, Vercel
 lib/
 ├── main.dart                    — App entry point
 ├── models/
-│   └── debris_data.dart         — Particle model + procedural generator
+│   ├── debris_data.dart         — Particle model + procedural generator
+│   ├── constellation.dart       — Satellite group definitions (Starlink, GPS, Iridium, etc.)
+│   └── satcat_record.dart       — SATCAT metadata model (country, launch date, RCS, etc.)
 ├── painters/
 │   └── space_debris_painter.dart — CustomPainter: 3D projection, Earth, rings, markers
 ├── screens/
 │   └── home_screen.dart         — Main screen: gestures, filters, time slider, popups, UI
-└── services/
-    ├── celestrak_service.dart   — CelesTrak API client with CORS proxy fallback
-    └── sgp4.dart                — SGP4 orbital propagator (Dart port)
+├── services/
+│   ├── celestrak_service.dart   — CelesTrak API client with CORS proxy + cache fallback
+│   └── sgp4.dart                — SGP4 orbital propagator (Dart port)
+└── utils/
+    ├── country_flags.dart       — Country flag emoji lookup from SATCAT country codes
+    └── url_params.dart          — URL query parameter parsing for screenshot/embed mode
 ```
 
 ### Data flow
@@ -119,11 +126,15 @@ DebrisGenerator.generate()  →  _allParticles  →  _displayParticles  →  Spa
 
 ## 📡 Data Sources
 
-**[CelesTrak](https://celestrak.org)** — Real-time TLE (Two-Line Element) sets maintained by the US Space Force. Fetched groups: `stations`, `visual`, `last-30-days`, `amateur`, `cubesat`, `active`, `rocket-body`.
+**[CelesTrak](https://celestrak.org)** — Real-time TLE (Two-Line Element) sets maintained by the US Space Force. Fetched groups: 14 categories covering active payloads, rocket bodies, debris, and special-interest objects.
+
+**Self-hosted cache** — A build-time TLE snapshot at `/api/tle.json` (served same-origin) enriched with SATCAT metadata. Refreshed by a server-side cron job. Provides CORS-free access for web clients.
 
 **SGP4** — The Simplified General Perturbations model (#4) is the standard algorithm for propagating near-Earth orbit elements. This Dart implementation handles secular perturbations (drag, J₂ gravity) and Kepler equation solving.
 
 **Procedural fallback** — When live data is unavailable, the app generates ~15,800 particles across all shells using a deterministic seed for reproducible results.
+
+**Constellation matching** — Satellite names are matched against 20 known constellation patterns (Starlink, OneWeb, GPS, Galileo, BeiDou, Iridium, etc.) for filtering and grouping — no extra API calls needed.
 
 ## 📜 License
 

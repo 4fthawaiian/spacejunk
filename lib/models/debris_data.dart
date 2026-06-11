@@ -17,6 +17,10 @@ class DebrisParticle {
   /// Rich SATCAT metadata, set when served from the self-hosted cache.
   final SatcatRecord? satcat;
 
+  /// Constellation / group name for filtering (e.g. 'starlink', 'oneweb').
+  /// Null for procedural particles.
+  final String? constellation;
+
   DebrisParticle({
     required this.x,
     required this.y,
@@ -28,6 +32,7 @@ class DebrisParticle {
     this.name,
     this.noradId = 0,
     this.satcat,
+    this.constellation,
   });
 }
 

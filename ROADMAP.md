@@ -29,6 +29,9 @@
 - [x] Auto-deploy pipeline — GitHub Action builds web + rsyncs to server on every push to main
 - [x] Desktop/tablet UI scaling — 150% zoom via SizedBox + MediaQuery + Transform.scale on screens >=600px
 - [x] Mouse wheel / trackpad scroll zoom for desktop web — scroll up zooms in, down zooms out
+- [x] Constellation filtering — identify satellites by group (Starlink, OneWeb, GPS, Iridium, etc.) with per-group toggles, counts, and isolation mode
+- [x] URL query parameter support — `?constellations=starlink,gps&hideShells=Debris&zoom=1.5&time=-30` for screenshot/embed/social previews
+- [x] Self-hosted TLE cache priority — cache-first fetch with SATCAT enrichment, CelesTrak direct as fallback
 
 
 ## 🚧 Cooldown (CelesTrak rate-limit, ~2026-06-11 to 06-13)
@@ -76,7 +79,7 @@
 ### Future Ideas
 - [ ] Satellite orbit paths (TLE-based ground tracks)
 - [ ] Real collision risk indicators (conjunction warnings)
-- [ ] Megaconstellation visualization (Starlink, OneWeb, Kuiper)
+- [ ] Megaconstellation visualization (Starlink, OneWeb, Kuiper) — constellation filtering partially covers this; dedicated orbit paths / shell highlighting still TBD
 - [ ] Spacecraft debris avoidance maneuvers
 - [ ] Kessler syndrome simulation (cascade effect)
 
