@@ -18,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'sgp4.dart';
 import '../models/debris_data.dart';
 import '../models/satcat_record.dart';
+import '../models/constellation.dart' as constellation;
 
 /// Orbital data for a single object from CelesTrak.
 class CelestrakObject {
@@ -384,6 +385,8 @@ class CelestrakService {
           shell = 'GEO';
         }
 
+        final constId = constellation.identifyConstellation(obj.name.toUpperCase());
+
         particles.add(DebrisParticle(
           x: modelX,
           y: modelY,
@@ -395,6 +398,7 @@ class CelestrakService {
           name: obj.name,
           noradId: obj.noradId,
           satcat: obj.satcat,
+          constellation: constId == 'other' ? null : constId,
         ));
       } catch (e) {
         // Skip objects that fail to propagate

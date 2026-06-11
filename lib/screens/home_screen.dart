@@ -8,6 +8,8 @@ import '../painters/space_debris_painter.dart';
 import '../utils/country_flags.dart';
 import '../services/celestrak_service.dart';
 import '../services/sgp4.dart';
+import '../models/constellation.dart' as constellation;
+import '../utils/url_params.dart';
 
 /// Seconds per day
 const _daySecs = 86400.0;
@@ -36,8 +38,14 @@ class _HomeScreenState extends State<HomeScreen>
   Offset? _lastFocalPoint;
   double _dragStartX = 0.15, _dragStartY = 0.0;
 
-  // ---- Filter ----
+  // ---- Filter: orbital shells ----
   final Set<String> _visibleShells = {'LEO', 'MEO', 'GEO', 'Debris', 'Station', 'Rocket-Body'};
+
+  // ---- Filter: constellations ----
+  final Set<String> _visibleConstellations = <String>{
+    for (final g in constellation.constellationGroups) g.id,
+  };
+  final Map<String, int> _constellationCounts = {};
 
   // ---- Counts ----
   int _leoCount = 0, _meoCount = 0, _geoCount = 0, _debrisCount = 0;
@@ -70,7 +78,19 @@ class _HomeScreenState extends State<HomeScreen>
     _allParticles = DebrisGenerator.generate();
     _propagators = [];
     _celestrakObjects = [];
+
+    // Apply URL query parameters for screenshot/embed mode
+    _applyUrlParams();
+
     _applyFiltersAndTime();
+    // Log URL-filtered state if active
+    if (_visibleConstellations.length < constellation.constellationGroups.length) {
+      debugPrint('URL filter: constellations=${_visibleConstellations.join(",")}');
+    }
+    if (_visibleShells.length < 6) {
+      debugPrint('URL filter: hidden shells=${const {'LEO','MEO','GEO','Debris','Station','Rocket-Body'}.difference(_visibleShells).join(",")}');
+    }
+
     final leoC = _allParticles.where((p) => p.shell == 'LEO').length;
     final meoC = _allParticles.where((p) => p.shell == 'MEO').length;
     final geoC = _allParticles.where((p) => p.shell == 'GEO').length;
@@ -124,22 +144,71 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ------------------------------------------------------------------
+  // URL PARAMS (for screenshot/embed mode)
+  // ------------------------------------------------------------------
+  void _applyUrlParams() {
+    final cfg = parseUrlParams();
+
+    // Constellations: if specified, set visible set to only those
+    if (cfg.constellations.isNotEmpty) {
+      _visibleConstellations.clear();
+      _visibleConstellations.addAll(cfg.constellations);
+      debugPrint('URL filter: showing only constellations: ${cfg.constellations.join(", ")}');
+    }
+
+    // Hide specific shells
+    if (cfg.hideShells.isNotEmpty) {
+      _visibleShells.removeAll(cfg.hideShells);
+    }
+
+    // Initial zoom
+    if (cfg.zoom != null) {
+      _zoom = cfg.zoom!;
+      _targetZoom = cfg.zoom!;
+    }
+
+    // Historical time offset
+    if (cfg.historicalOffsetDays != null) {
+      _historicalOffsetDays = cfg.historicalOffsetDays!;
+      _showTimeSlider = true;
+    }
+  }
+
+  // ------------------------------------------------------------------
   // FILTER & TIME WARP
   // ------------------------------------------------------------------
   void _applyFiltersAndTime() {
     final offsetMinutes = _historicalOffsetDays * 1440.0;
 
+    // Filter: visible shells and visible constellations
+    // When any constellation is hidden, we isolate — only objects in visible
+    // constellations are shown (non-constellation objects hidden too).
+    // When all constellations are visible, everything passes.
+    final bool _isolateMode =
+        _visibleConstellations.length < constellation.constellationGroups.length;
+
+    bool passesConstellation(DebrisParticle p) {
+      if (p.constellation == null) {
+        // In isolate mode, hide non-constellation objects (debris, rocket
+        // bodies, unmatched sats). In normal mode, show everything.
+        return !_isolateMode;
+      }
+      return _visibleConstellations.contains(p.constellation);
+    }
+
     if (offsetMinutes == 0.0 && _propagators.isEmpty) {
       // No time offset, no live data — just filter
-      _displayParticles =
-          _allParticles.where((p) => _visibleShells.contains(p.shell)).toList();
+      _displayParticles = _allParticles
+          .where((p) => _visibleShells.contains(p.shell) && passesConstellation(p))
+          .toList();
       _computeCounts();
       return;
     }
 
     // Apply both filter and time offset
-    final filtered =
-        _allParticles.where((p) => _visibleShells.contains(p.shell)).toList();
+    final filtered = _allParticles
+        .where((p) => _visibleShells.contains(p.shell) && passesConstellation(p))
+        .toList();
 
     if (offsetMinutes == 0.0) {
       _displayParticles = filtered;
@@ -210,6 +279,17 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  void _toggleConstellation(String id) {
+    setState(() {
+      if (_visibleConstellations.contains(id)) {
+        _visibleConstellations.remove(id);
+      } else {
+        _visibleConstellations.add(id);
+      }
+      _applyFiltersAndTime();
+    });
+  }
+
   void _computeCounts() {
     _leoCount = 0;
     _meoCount = 0;
@@ -217,6 +297,10 @@ class _HomeScreenState extends State<HomeScreen>
     _debrisCount = 0;
     _stationCount = 0;
     _rocketBodyCount = 0;
+    _constellationCounts.clear();
+    for (final g in constellation.constellationGroups) {
+      _constellationCounts[g.id] = 0;
+    }
     for (final p in _allParticles) {
       switch (p.shell) {
         case 'LEO': _leoCount++; break;
@@ -225,6 +309,11 @@ class _HomeScreenState extends State<HomeScreen>
         case 'Debris': _debrisCount++; break;
         case 'Station': _stationCount++; break;
         case 'Rocket-Body': _rocketBodyCount++; break;
+      }
+      if (p.constellation != null &&
+          _constellationCounts.containsKey(p.constellation)) {
+        _constellationCounts[p.constellation!] =
+            _constellationCounts[p.constellation!]! + 1;
       }
     }
     _totalCount = _allParticles.length;
@@ -809,6 +898,12 @@ class _HomeScreenState extends State<HomeScreen>
           if (_dataSource == 'live' && _lastUpdate.isNotEmpty)
             Text(_lastUpdate,
               style: TextStyle(fontSize: 8, letterSpacing: 1, color: Colors.white.withValues(alpha: 0.15))),
+          if (_visibleConstellations.length < constellation.constellationGroups.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text('ISOLATING: ${_visibleConstellations.length} constellation(s) — other objects hidden',
+                style: TextStyle(fontSize: 7, letterSpacing: 0.8, color: const Color(0xFFF7C948).withValues(alpha: 0.5))),
+            ),
           if (_fetchError.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -917,6 +1012,8 @@ class _HomeScreenState extends State<HomeScreen>
 
             // ── Common details ──
             _popupRow('Orbit', p.shell),
+            if (p.constellation != null)
+              _popupRow('Constellation', constellation.constellationLabel(p.constellation!)),
             _popupRow('Altitude', '$altStr km'),
             _popupRow('Data source',
               satcat != null ? 'CelesTrak' :
@@ -1294,6 +1391,8 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       builder: (_) => _FilterSheet(
         initialVisibleShells: _visibleShells,
+        initialVisibleConstellations: _visibleConstellations,
+        constellationCounts: Map.from(_constellationCounts),
         totalCount: _totalCount,
         leoCount: _leoCount,
         meoCount: _meoCount,
@@ -1303,6 +1402,7 @@ class _HomeScreenState extends State<HomeScreen>
         dataSource: _dataSource,
         showStarfield: _showStarfield,
         onToggle: _toggleShell,
+        onToggleConstellation: _toggleConstellation,
         onToggleStarfield: () => setState(() {
           _showStarfield = !_showStarfield;
         }),
@@ -1316,14 +1416,19 @@ class _HomeScreenState extends State<HomeScreen>
 // ======================================================================
 class _FilterSheet extends StatefulWidget {
   final Set<String> initialVisibleShells;
+  final Set<String> initialVisibleConstellations;
+  final Map<String, int> constellationCounts;
   final int totalCount, leoCount, meoCount, geoCount, debrisCount, stationCount;
   final String dataSource;
   final bool showStarfield;
   final void Function(String shell) onToggle;
+  final void Function(String id) onToggleConstellation;
   final VoidCallback onToggleStarfield;
 
   const _FilterSheet({
     required this.initialVisibleShells,
+    required this.initialVisibleConstellations,
+    required this.constellationCounts,
     required this.totalCount,
     required this.leoCount,
     required this.meoCount,
@@ -1333,6 +1438,7 @@ class _FilterSheet extends StatefulWidget {
     required this.dataSource,
     required this.showStarfield,
     required this.onToggle,
+    required this.onToggleConstellation,
     required this.onToggleStarfield,
   });
 
@@ -1342,12 +1448,14 @@ class _FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<_FilterSheet> {
   late Set<String> _visibleShells;
+  late Set<String> _visibleConstellations;
   late bool _showStarfield;
 
   @override
   void initState() {
     super.initState();
     _visibleShells = Set.from(widget.initialVisibleShells);
+    _visibleConstellations = Set.from(widget.initialVisibleConstellations);
     _showStarfield = widget.showStarfield;
   }
 
@@ -1360,6 +1468,17 @@ class _FilterSheetState extends State<_FilterSheet> {
       }
     });
     widget.onToggle(shell);
+  }
+
+  void _handleToggleConstellation(String id) {
+    setState(() {
+      if (_visibleConstellations.contains(id)) {
+        _visibleConstellations.remove(id);
+      } else {
+        _visibleConstellations.add(id);
+      }
+    });
+    widget.onToggleConstellation(id);
   }
 
   void _handleToggleStarfield() {
@@ -1437,6 +1556,8 @@ class _FilterSheetState extends State<_FilterSheet> {
             stationCount),
           _filterRow(const Color(0xFFC10A0A), 'Rocket-Body', 'Rocket Bodies', 'Launch vehicles and spent stages', 0),
 
+          const SizedBox(height: 20),
+          _buildConstellationFilterSection(),
           const SizedBox(height: 10),
           _starfieldToggle(_showStarfield, _handleToggleStarfield),
           const SizedBox(height: 16),
@@ -1526,6 +1647,108 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
             ]),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Constellation filter as compact toggle chips.
+  Widget _buildConstellationFilterSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Icon(Icons.group_work_rounded,
+              color: Colors.white.withValues(alpha: 0.5), size: 18),
+          const SizedBox(width: 8),
+          Text('Filter by Constellation',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.8), letterSpacing: 1)),
+        ]),
+        const SizedBox(height: 4),
+        Text('Toggle a group → isolate only those satellites on the globe:',
+          style: TextStyle(fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.35))),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final g in constellation.constellationGroups)
+              _constellationChip(g),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _constellationChip(constellation.ConstellationGroup g) {
+    final isVisible = _visibleConstellations.contains(g.id);
+    final count = widget.constellationCounts[g.id] ?? 0;
+    final chipColor = Color(g.color);
+    return GestureDetector(
+      onTap: () => _handleToggleConstellation(g.id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isVisible
+              ? chipColor.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isVisible
+                ? chipColor.withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.08),
+            width: isVisible ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isVisible
+                    ? chipColor
+                    : Colors.white.withValues(alpha: 0.2),
+                boxShadow: isVisible
+                    ? [
+                        BoxShadow(
+                            color: chipColor.withValues(alpha: 0.5),
+                            blurRadius: 4)
+                      ]
+                    : [],
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              g.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight:
+                    isVisible ? FontWeight.w600 : FontWeight.w400,
+                color: isVisible
+                    ? chipColor.withValues(alpha: 0.9)
+                    : Colors.white.withValues(alpha: 0.25),
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 3),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 8,
+                  color: isVisible
+                      ? chipColor.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.15),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
