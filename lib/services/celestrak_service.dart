@@ -2,7 +2,10 @@
 ///
 /// CelesTrak provides TLE (Two-Line Element) data for thousands of
 /// tracked objects in space — satellites, debris, rocket bodies, etc.
-/// No API key required.
+///
+/// Primary data source: same-origin cache endpoint (/api/tle.json)
+/// bundled at CI build time. Falls back to CelesTrak + CORS proxies,
+/// then to procedural data in the caller.
 ///
 /// API: https://celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=json
 library;
@@ -86,11 +89,15 @@ class CelestrakFetchResult {
   final List<DebrisParticle> particles;
   final DateTime timestamp;
 
+  /// Where the data came from: 'cache', 'live', or 'procedural'.
+  String dataSource;
+
   CelestrakFetchResult({
     required this.objects,
     required this.propagators,
     required this.particles,
     required this.timestamp,
+    this.dataSource = 'live',
   });
 }
 
@@ -106,7 +113,13 @@ class CelestrakService {
     'https://corsproxy.org/?url=',
   ];
 
+  /// Same-origin cached TLE endpoint (bundled at CI build time,
+  /// refreshed by server cron). No CORS issues, always available.
+  static const String _selfHostedUrl = '/api/tle.json';
+
   /// Groups to fetch. Each returns a JSON array of orbital element sets.
+  /// Note: "rocket-body" is not a valid CelesTrak group (objects are
+  /// identified by name parsing instead).
   static const List<String> defaultGroups = [
     'stations',
     'visual',
@@ -114,7 +127,9 @@ class CelestrakService {
     'amateur',
     'cubesat',
     'active',
-    'rocket-body',
+    'science',
+    'geo',
+    'gps-ops',
   ];
 
   CelestrakState _state = CelestrakState.initial;
@@ -127,17 +142,19 @@ class CelestrakService {
   CelestrakFetchResult? get lastResult => _lastResult;
   DateTime? get lastFetch => _lastFetch;
 
-  /// Fetch orbital data from CelesTrak.
+  /// Fetch orbital data, trying same-origin cache first, then CelesTrak.
   ///
-  /// Fetches the specified [groups] (or all default groups) and processes
-  /// the orbital data into propagatable SGP4 instances + DebrisParticles.
+  /// Sources tried in order:
+  ///   1. /api/tle.json (same-origin, bundled at CI build time)
+  ///   2. CelesTrak direct + CORS proxies
+  ///   3. Caller falls back to procedural data
   Future<CelestrakFetchResult> fetch({
     List<String>? groups,
     bool forceRefresh = false,
   }) async {
     groups ??= defaultGroups;
 
-    // Rate limit: don't fetch more than once per 30 minutes unless forced
+    // Rate limit: don't re-fetch more than once per 30 minutes unless forced
     if (!forceRefresh &&
         _lastFetch != null &&
         DateTime.now().difference(_lastFetch!).inMinutes < 30) {
@@ -147,62 +164,103 @@ class CelestrakService {
     _state = CelestrakState.loading;
     _error = null;
 
+    // Try the same-origin cache first (bundled snapshot + server cron)
     try {
-      final allObjects = <CelestrakObject>[];
-      final seenIds = <int>{};
-
-      // Fetch each group — try direct first, then CORS proxies
-      for (final group in groups) {
-        try {
-          final url = '$_baseUrl?GROUP=$group&FORMAT=json';
-          http.Response response;
-
-          // Try direct fetch first
-          try {
-            response = await http.get(Uri.parse(url)).timeout(
-              const Duration(seconds: 10),
-            );
-          } catch (_) {
-            // Direct failed, try each CORS proxy in order
-            response = await _fetchWithProxies(url);
-          }
-
-          if (response.statusCode != 200) {
-            // Try proxies if direct returned non-200
-            response = await _fetchWithProxies(url);
-          }
-
-          if (response.statusCode != 200) continue;
-
-          final List<dynamic> jsonList = json.decode(response.body);
-          for (final item in jsonList) {
-            final obj = CelestrakObject.fromJson(item as Map<String, dynamic>);
-            if (seenIds.add(obj.noradId)) {
-              allObjects.add(obj);
-            }
-          }
-        } catch (e) {
-          continue;
-        }
+      final cacheResult = await _fetchFromCache();
+      if (cacheResult != null && cacheResult.objects.isNotEmpty) {
+        cacheResult.dataSource = 'cache';
+        _lastResult = cacheResult;
+        _lastFetch = DateTime.now();
+        _state = CelestrakState.loaded;
+        return cacheResult;
       }
+    } catch (_) {
+      // Cache unavailable — fall through to CelesTrak
+    }
 
-      if (allObjects.isEmpty) {
-        throw CelestrakException('No objects fetched from any group');
-      }
-
-      // Create propagators and particles
-      final result = _processObjects(allObjects);
-
+    // Fall back to CelesTrak (direct + CORS proxies)
+    try {
+      final result = await _fetchFromCelestrak(groups);
       _lastResult = result;
       _lastFetch = DateTime.now();
       _state = CelestrakState.loaded;
-
       return result;
     } catch (e) {
       _state = CelestrakState.error;
       _error = e.toString();
       rethrow;
     }
+  }
+
+  /// Fetch from the same-origin cached TLE endpoint.
+  Future<CelestrakFetchResult?> _fetchFromCache() async {
+    try {
+      final response = await http
+          .get(Uri.parse(_selfHostedUrl))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) return null;
+
+      final List<dynamic> jsonList = json.decode(response.body);
+      if (jsonList.isEmpty) return null;
+
+      final objects = jsonList
+          .map((item) => CelestrakObject.fromJson(item as Map<String, dynamic>))
+          .where((obj) => obj.noradId != 0)
+          .toList();
+
+      if (objects.isEmpty) return null;
+
+      return _processObjects(objects);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetch from CelesTrak group endpoints (direct + CORS proxies).
+  Future<CelestrakFetchResult> _fetchFromCelestrak(
+      List<String> groups) async {
+    final allObjects = <CelestrakObject>[];
+    final seenIds = <int>{};
+
+    for (final group in groups) {
+      try {
+        final url = '$_baseUrl?GROUP=$group&FORMAT=json';
+        http.Response response;
+
+        // Try direct fetch first
+        try {
+          response = await http.get(Uri.parse(url)).timeout(
+            const Duration(seconds: 10),
+          );
+        } catch (_) {
+          response = await _fetchWithProxies(url);
+        }
+
+        if (response.statusCode != 200) {
+          response = await _fetchWithProxies(url);
+        }
+
+        if (response.statusCode != 200) continue;
+
+        final List<dynamic> jsonList = json.decode(response.body);
+        for (final item in jsonList) {
+          final obj =
+              CelestrakObject.fromJson(item as Map<String, dynamic>);
+          if (seenIds.add(obj.noradId)) {
+            allObjects.add(obj);
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    if (allObjects.isEmpty) {
+      throw CelestrakException('No objects fetched from any group');
+    }
+
+    return _processObjects(allObjects);
   }
 
   /// Process CelesTrak objects into SGP4 propagators and DebrisParticles.

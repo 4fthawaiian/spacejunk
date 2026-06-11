@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen>
           .where((p) => p.shell == 'Station').toList();
       // Always blend: live data + procedural debris + procedural stations
       _allParticles = [...live, ...debris, ...stations];
-      _dataSource = 'live';
+      _dataSource = result.dataSource; // 'cache' or 'live'
       _fetchError = '';
       _lastUpdate = DateTime.now().toLocal().toString().substring(0, 19);
       _applyFiltersAndTime();
@@ -158,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen>
 
       // Try to find a propagator for live particles
       // (during procedural mode, there are none — use orbital rotation)
-      if (_dataSource == 'live' &&
+      if (_dataSource != 'procedural' &&
           _propagators.isNotEmpty &&
           _celestrakObjects.isNotEmpty) {
         // Match by color as a proxy (not perfect but works for viz)
@@ -773,9 +773,13 @@ class _HomeScreenState extends State<HomeScreen>
               style: TextStyle(fontSize: 9, letterSpacing: 2, color: Colors.white.withValues(alpha: 0.3))),
           ])
         else ...[
-          Text(_dataSource == 'live' ? 'LIVE DATA' : 'SIMULATED',
+          Text(
+            _dataSource == 'cache' ? 'CACHED DATA' :
+            _dataSource == 'live' ? 'LIVE DATA' : 'SIMULATED',
             style: TextStyle(fontSize: 9, letterSpacing: 2,
-              color: _dataSource == 'live' ? const Color(0xFF4FC3F7).withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.2))),
+              color: _dataSource == 'live' ? const Color(0xFF4FC3F7).withValues(alpha: 0.6) :
+                     _dataSource == 'cache' ? const Color(0xFF69F0AE).withValues(alpha: 0.6) :
+                     Colors.white.withValues(alpha: 0.2))),
           if (_dataSource == 'live' && _lastUpdate.isNotEmpty)
             Text(_lastUpdate,
               style: TextStyle(fontSize: 8, letterSpacing: 1, color: Colors.white.withValues(alpha: 0.15))),
@@ -867,7 +871,9 @@ class _HomeScreenState extends State<HomeScreen>
             // Details
             _popupRow('Orbit', p.shell),
             _popupRow('Altitude', '$altStr km'),
-            _popupRow('Data source', _dataSource == 'live' ? 'CelesTrak' : 'Simulation'),
+            _popupRow('Data source',
+              _dataSource == 'live' ? 'CelesTrak (live)' :
+              _dataSource == 'cache' ? 'CelesTrak (cached)' : 'Simulation'),
             if (_historicalOffsetDays != 0.0)
               _popupRow('Viewing', _formatDate(_historicalOffsetDays)),
             // Footer hint
