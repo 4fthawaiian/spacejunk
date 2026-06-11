@@ -169,12 +169,12 @@ class CelestrakService {
   /// Per-group timeout for Celestrak HTTP calls.
   static const Duration _groupTimeout = Duration(seconds: 5);
 
-  /// Fetch orbital data, trying CelesTrak directly first, then the
-  /// self-hosted cache, then falling back to procedural data.
+  /// Fetch orbital data, trying the self-hosted cache first (always works
+  /// same-origin), then CelesTrak as a live-data enhancement.
   ///
   /// Sources tried in order:
-  ///   1. CelesTrak direct + CORS proxies (client-initiated, live data)
-  ///   2. /api/tle.json (self-hosted cache, web only)
+  ///   1. /api/tle.json (self-hosted cache, web only, same-origin, no CORS)
+  ///   2. CelesTrak direct + CORS proxies (client-initiated, live data)
   ///   3. Caller falls back to procedural data
   Future<CelestrakFetchResult> fetch({
     List<String>? groups,
@@ -192,21 +192,7 @@ class CelestrakService {
     _state = CelestrakState.loading;
     _error = null;
 
-    // Try Celestrak directly (client-initiated, live data).
-    // Global timeout so we don't hang forever on mobile.
-    try {
-      final result = await _fetchFromCelestrak(groups)
-          .timeout(_globalTimeout);
-      _lastResult = result;
-      _lastFetch = DateTime.now();
-      _state = CelestrakState.loaded;
-      return result;
-    } catch (_) {
-      // Celestrak unreachable — fall through
-    }
-
-    // Fall back to the self-hosted cache (bundled at CI build time).
-    // Only makes sense on web where the app is served from a domain.
+    // 1. Try the self-hosted cache first (same-origin, always works on web).
     if (kIsWeb) {
       try {
         final cacheResult = await _fetchFromCache();
@@ -218,8 +204,21 @@ class CelestrakService {
           return cacheResult;
         }
       } catch (_) {
-        // Cache unavailable — fall through to error
+        // Cache unavailable — fall through to Celestrak
       }
+    }
+
+    // 2. Try CelesTrak directly (live data via CORS proxies).
+    // Short timeout so we don't keep the user waiting.
+    try {
+      final result = await _fetchFromCelestrak(groups)
+          .timeout(const Duration(seconds: 10));
+      _lastResult = result;
+      _lastFetch = DateTime.now();
+      _state = CelestrakState.loaded;
+      return result;
+    } catch (_) {
+      // Celestrak unreachable — fall through
     }
 
     // Nothing worked — caller will use procedural fallback

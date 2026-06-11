@@ -90,11 +90,11 @@ class SatcatRecord {
       launchDate: json['LAUNCH_DATE'] as String? ?? '',
       launchSite: json['LAUNCH_SITE'] as String? ?? '',
       decayDate: json['DECAY_DATE'] as String? ?? '',
-      period: (json['PERIOD'] as num?)?.toDouble(),
-      inclination: (json['INCLINATION'] as num?)?.toDouble(),
-      apogee: (json['APOGEE'] as num?)?.toDouble(),
-      perigee: (json['PERIGEE'] as num?)?.toDouble(),
-      rcs: (json['RCS'] as num?)?.toDouble(),
+      period: _toDouble(json['PERIOD']),
+      inclination: _toDouble(json['INCLINATION']),
+      apogee: _toDouble(json['APOGEE']),
+      perigee: _toDouble(json['PERIGEE']),
+      rcs: _toDouble(json['RCS']),
       dataStatusCode: json['DATA_STATUS_CODE'] as String? ?? '',
       orbitCenter: json['ORBIT_CENTER'] as String? ?? '',
       orbitType: json['ORBIT_TYPE'] as String? ?? '',
@@ -127,6 +127,18 @@ class SatcatRecord {
       orbitCenter: fields['ORBIT_CENTER'] ?? '',
       orbitType: fields['ORBIT_TYPE'] ?? '',
     );
+  }
+
+  /// Safely convert a JSON value to double, accepting num, String, or null.
+  /// Catches cases where SATCAT embeds empty strings (e.g., RCS="").
+  static double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return null;
   }
 
   @override
