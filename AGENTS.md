@@ -1,5 +1,8 @@
--- live prod site is junk.4ft.me, updated via GH action
+-- live prod sites: junk.4ft.me and spacejunk.4ft.me both serve from /opt/junk/, updated via GH action on push to main
+-- canonical domain is spacejunk.4ft.me (used in sitemap/SEO meta)
 -- test site is usually running at test.4ft.me
 -- if the test site isn't running you can change to build/web and run `serve -l tcp://0.0.0.0:3000` to bring it up. an nginx proxy will connect to it.
+-- app is branded as SpaceJunk (not TrashMap) everywhere user-facing
 -- this is a flutter app, concentrated on web and android for now
+-- android wireless ADB device: M7 (paired via mDNS, serial adb-0123456789ABCDEF-vN4MkB)
 -- once a new change is tested and pushed, remind the user to update the roadmap
