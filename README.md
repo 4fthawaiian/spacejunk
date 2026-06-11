@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="TrashMap — 3D space debris visualization" src="new_screenshot.png" width="100%">
+  <img alt="SpaceJunk — 3D space debris visualization" src="new_screenshot.png" width="100%">
 </p>
 
 <p align="center">
@@ -14,12 +14,12 @@
 </p>
 
 <p align="center">
-  <b><a href="https://junk.4ft.me">➜ See it live → junk.4ft.me</a></b>
+  <b><a href="https://spacejunk.4ft.me">➜ See it live → spacejunk.4ft.me</a></b>
 </p>
 
 ---
 
-TrashMap renders the orbital debris environment around Earth in real-time 3D. Hundreds of thousands of human-made objects — defunct satellites, rocket bodies, collision fragments, and active spacecraft — orbit our planet at speeds up to 28,000 km/h. This app visualises them all in a single interactive view.
+SpaceJunk renders the orbital debris environment around Earth in real-time 3D. Hundreds of thousands of human-made objects — defunct satellites, rocket bodies, collision fragments, and active spacecraft — orbit our planet at speeds up to 28,000 km/h. This app visualises them all in a single interactive view.
 
 ## ✨ Features
 
@@ -52,7 +52,7 @@ TrashMap renders the orbital debris environment around Earth in real-time 3D. Hu
 ### Run on Android
 
 ```bash
-cd trashmap
+cd spacejunk
 flutter run -d <device-id>
 ```
 
