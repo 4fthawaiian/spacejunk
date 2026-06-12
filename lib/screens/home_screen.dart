@@ -91,14 +91,17 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     // Load persisted flag
     SharedPreferences.getInstance().then((prefs) {
+      final seen = prefs.getBool('hasSeenInfo') ?? false;
       setState(() {
-        _hasSeenInfo = prefs.getBool('hasSeenInfo') ?? false;
+        _hasSeenInfo = seen;
       });
-      if (!_hasSeenInfo) {
+      if (!seen) {
         // Show dialog on first visit
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && context != null) {
             _showInfoDialog();
+            // Persist so we don't show again on refresh
+            prefs.setBool('hasSeenInfo', true);
           }
         });
       }
