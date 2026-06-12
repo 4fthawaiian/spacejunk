@@ -296,6 +296,10 @@ class _HomeScreenState extends State<HomeScreen>
             shell: p.shell,
             color: p.color,
             size: p.size,
+            name: p.name,
+            noradId: p.noradId,
+            satcat: p.satcat,
+            constellation: p.constellation,
           ),
         );
       }
@@ -461,7 +465,12 @@ class _HomeScreenState extends State<HomeScreen>
       final satcat =
           nearest.satcat ??
           (nearest.noradId > 0 ? _celestrak.getSatcat(nearest.noradId) : null);
-      final name = satcat?.objectName ?? nearest.name ?? _defaultName(nearest);
+      // Use helper to treat empty strings as missing (API can return '')
+      final name = _firstNonEmpty([
+        satcat?.objectName,
+        nearest.name,
+        _defaultName(nearest),
+      ]);
       setState(() {
         _selectedParticle = nearest;
         _selectedName = name;
@@ -489,8 +498,11 @@ class _HomeScreenState extends State<HomeScreen>
       if (current == null || current.noradId != p.noradId) return;
       setState(() {
         final satcat = _celestrak.getSatcat(current.noradId);
-        _selectedName =
-            satcat?.objectName ?? current.name ?? _defaultName(current);
+        _selectedName = _firstNonEmpty([
+          satcat?.objectName,
+          current.name,
+          _defaultName(current),
+        ]);
       });
     });
   }
@@ -509,9 +521,21 @@ class _HomeScreenState extends State<HomeScreen>
         return 'GEO satellite — geostationary';
       case 'Debris':
         return 'Untracked debris fragment';
+      case 'Rocket-Body':
+        final alt = p.altitude.toStringAsFixed(0);
+        return 'Rocket body — $alt km';
       default:
         return 'Orbital object';
     }
+  }
+
+  /// Returns the first non-null, non-empty string from the list.
+  /// Treats empty strings as missing (CelesTrak API can return '').
+  String _firstNonEmpty(List<String?> values) {
+    for (final v in values) {
+      if (v != null && v.isNotEmpty) return v;
+    }
+    return 'Unknown object';
   }
 
   // ------------------------------------------------------------------
