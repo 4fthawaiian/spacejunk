@@ -328,7 +328,6 @@ class SpaceDebrisPainter extends CustomPainter {
   // Stations — drawn on top of Earth so they always pop
   // ------------------------------------------------------------------
   void _drawStations(Canvas canvas, double cx, double cy, double scale, Size canvasSize) {
-    final paint = Paint();
     final bounds = Rect.fromLTWH(-50, -50, canvasSize.width + 100, canvasSize.height + 100);
     const gold = Color(0xFFFFD740);
 
@@ -344,37 +343,61 @@ class SpaceDebrisPainter extends CustomPainter {
       final depthFactor = ((sz + 2.0) / 3.5).clamp(0.0, 1.0);
       final opacity = (0.7 + 0.3 * depthFactor).clamp(0.0, 1.0);
 
-      // ---- White outer glow ----
-      paint.color = Colors.white.withValues(alpha: opacity * 0.06);
-      canvas.drawCircle(Offset(sx, sy), 24.0, paint);
+      // Station size scales with depth
+      final baseSize = 10.0;
+      final stationSize = baseSize * (0.8 + 0.4 * depthFactor);
 
-      // ---- Gold glow ----
-      paint.color = gold.withValues(alpha: opacity * 0.15);
-      canvas.drawCircle(Offset(sx, sy), 16.0, paint);
-
-      // ---- Outer ring (stroke) ----
-      paint.style = PaintingStyle.stroke;
-      paint.strokeWidth = 1.8;
-      paint.color = gold.withValues(alpha: opacity * 0.6);
-      canvas.drawCircle(Offset(sx, sy), 10.0, paint);
-      paint.style = PaintingStyle.fill;
-
-      // ---- Crosshair ----
-      paint.strokeWidth = 1.5;
-      paint.color = gold.withValues(alpha: opacity * 0.5);
-      final ch = 14.0;
-      canvas.drawLine(Offset(sx - ch, sy), Offset(sx + ch, sy), paint);
-      canvas.drawLine(Offset(sx, sy - ch), Offset(sx, sy + ch), paint);
-
-      // ---- Gold core dot ----
-      paint.strokeWidth = 1.0;
-      paint.color = gold.withValues(alpha: opacity);
-      canvas.drawCircle(Offset(sx, sy), 5.0, paint);
-
-      // ---- White center ----
-      paint.color = Colors.white.withValues(alpha: opacity * 0.9);
-      canvas.drawCircle(Offset(sx, sy), 2.5, paint);
+      // Draw refined station marker
+      _drawStationMarker(canvas, sx, sy, stationSize, opacity, gold);
     }
+  }
+
+  /// Draws a clean station marker: subtle diamond + bright center.
+  void _drawStationMarker(
+    Canvas canvas,
+    double x,
+    double y,
+    double size,
+    double opacity,
+    Color color,
+  ) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final fillPaint = Paint()
+      ..color = color.withValues(alpha: opacity * 0.15)
+      ..style = PaintingStyle.fill;
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: opacity * 0.2)
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
+
+    final r = size * 0.7; // diamond radius
+
+    // Soft outer glow
+    canvas.drawCircle(Offset(x, y), r * 1.6, glowPaint);
+
+    // Diamond outline (rotated square)
+    final diamondPath = Path()
+      ..moveTo(x, y - r)
+      ..lineTo(x + r * 0.7, y)
+      ..lineTo(x, y + r)
+      ..lineTo(x - r * 0.7, y)
+      ..close();
+    canvas.drawPath(diamondPath, fillPaint);
+    canvas.drawPath(diamondPath, paint);
+
+    // Thin crosshair (subtle)
+    paint.strokeWidth = 0.8;
+    paint.color = color.withValues(alpha: opacity * 0.4);
+    final ch = r * 1.3;
+    canvas.drawLine(Offset(x - ch, y), Offset(x + ch, y), paint);
+    canvas.drawLine(Offset(x, y - ch), Offset(x, y + ch), paint);
+
+    // Bright center highlight
+    fillPaint.color = Colors.white.withValues(alpha: opacity * 0.9);
+    canvas.drawCircle(Offset(x, y), size * 0.18, fillPaint);
   }
 
   @override
