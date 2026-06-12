@@ -135,9 +135,11 @@ class CelestrakService {
     'https://corsproxy.org/?url=',
   ];
 
-  /// Same-origin cached TLE endpoint (bundled at CI build time,
-  /// refreshed by server cron). No CORS issues, always available.
-  static const String _selfHostedUrl = '/api/tle.json';
+  /// Self-hosted cached TLE endpoint (bundled at CI build time,
+  /// refreshed by server cron). No CORS issues on web; mobile uses absolute URL.
+  static const String _selfHostedUrl = kIsWeb
+      ? '/api/tle.json'
+      : 'https://spacejunk.4ft.me/api/tle.json';
 
   /// Groups to fetch. Each returns a JSON array of orbital element sets.
   /// Note: "rocket-body" is not a valid CelesTrak group (objects are
@@ -170,11 +172,10 @@ class CelestrakService {
   /// Per-group timeout for Celestrak HTTP calls.
   static const Duration _groupTimeout = Duration(seconds: 5);
 
-  /// Fetch orbital data, trying the self-hosted cache first (always works
-  /// same-origin), then CelesTrak as a live-data enhancement.
+  /// Fetch orbital data, trying the self-hosted cache first, then CelesTrak.
   ///
   /// Sources tried in order:
-  ///   1. /api/tle.json (self-hosted cache, web only, same-origin, no CORS)
+  ///   1. Self-hosted cache (same-origin on web, absolute URL on mobile)
   ///   2. CelesTrak direct + CORS proxies (client-initiated, live data)
   ///   3. Caller falls back to procedural data
   Future<CelestrakFetchResult> fetch({
@@ -193,20 +194,18 @@ class CelestrakService {
     _state = CelestrakState.loading;
     _error = null;
 
-    // 1. Try the self-hosted cache first (same-origin, always works on web).
-    if (kIsWeb) {
-      try {
-        final cacheResult = await _fetchFromCache();
-        if (cacheResult != null && cacheResult.objects.isNotEmpty) {
-          cacheResult.dataSource = 'cache';
-          _lastResult = cacheResult;
-          _lastFetch = DateTime.now();
-          _state = CelestrakState.loaded;
-          return cacheResult;
-        }
-      } catch (_) {
-        // Cache unavailable — fall through to Celestrak
+    // 1. Try the self-hosted cache first (works on all platforms now).
+    try {
+      final cacheResult = await _fetchFromCache();
+      if (cacheResult != null && cacheResult.objects.isNotEmpty) {
+        cacheResult.dataSource = 'cache';
+        _lastResult = cacheResult;
+        _lastFetch = DateTime.now();
+        _state = CelestrakState.loaded;
+        return cacheResult;
       }
+    } catch (_) {
+      // Cache unavailable — fall through to Celestrak
     }
 
     // 2. Try CelesTrak directly (live data via CORS proxies).

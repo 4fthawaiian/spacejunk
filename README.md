@@ -76,11 +76,11 @@ flutter build web --release --wasm
 
 Serve the `build/web` directory via any static file server (GitHub Pages, Vercel, Netlify, etc.).
 
-> **Data sources (priority order):** 1) CelesTrak direct + CORS proxies (client-side),
-> 2) self-hosted TLE cache at `/api/tle.json` (same-origin, web only),
-> 3) procedural simulation (always works). The self-hosted cache is refreshed periodically
-> from CelesTrak and includes SATCAT metadata for enriched tap popups.
-> Android/iOS builds skip the cache and fetch directly.
+> **Data sources (priority order):** 1) Self-hosted TLE cache at `/api/tle.json`
+> (same-origin on web, absolute URL on mobile), 2) CelesTrak direct + CORS proxies
+> (client-side), 3) procedural simulation (always works). The self-hosted cache is
+> refreshed periodically from CelesTrak and includes SATCAT metadata for enriched
+> tap popups on all platforms.
 
 ## 🧭 Orbital Shells
 
