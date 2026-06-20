@@ -33,6 +33,7 @@ SpaceJunk renders the orbital debris environment around Earth in real-time 3D. H
 - **Filter panel** — toggle individual shells, show/hide starfield, all with tactile Cupertino-style switches
 - **Quick-access pills** — one-tap shell toggles anchored to the left of the viewport
 - **Constellation filter** — isolate satellites by group (Starlink, OneWeb, GPS, Iridium, etc.) with per-group toggles and object counts
+- **Country filter** — isolate objects by country of origin with a searchable flag picker; stacks with all other filters
 - **Station markers** — gold crosshair+ring markers for crewed outposts (ISS, Tiangong)
 - **Info dialog** — learn about orbital shells, data sources, and the space debris problem
 

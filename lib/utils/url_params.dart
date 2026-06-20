@@ -19,6 +19,11 @@ class UrlFilterConfig {
   /// Initial time offset in days (-365..+365), null if not specified.
   final double? historicalOffsetDays;
 
+  /// Country owner codes to show (e.g. ['US', 'PRC', 'RUSS']).
+  /// When non-empty, only objects owned by these countries are shown
+  /// (plus objects without country data, which pass through).
+  final Set<String> countries;
+
   /// Whether to force isolation mode (hide non-constellation objects).
   bool get isolation => constellations.isNotEmpty;
 
@@ -27,6 +32,7 @@ class UrlFilterConfig {
     this.hideShells = const {},
     this.zoom,
     this.historicalOffsetDays,
+    this.countries = const {},
   });
 }
 
@@ -70,10 +76,22 @@ UrlFilterConfig parseUrlParams() {
     if (time != null) time = time.clamp(-365, 365);
   }
 
+  // Countries: CSV of owner codes to SHOW (additive isolation)
+  Set<String> countries = {};
+  if (params.containsKey('countries')) {
+    final raw = params['countries']!;
+    countries = raw
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .where((s) => s.isNotEmpty)
+        .toSet();
+  }
+
   return UrlFilterConfig(
     constellations: constellations,
     hideShells: hideShells,
     zoom: zoom,
     historicalOffsetDays: time,
+    countries: countries,
   );
 }

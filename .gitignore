@@ -43,3 +43,12 @@ Thumbs.db
 # Logs
 *.log
 /tmp/
+
+# Visual snapshot tooling
+node_modules/
+snapshots/current/
+snapshots/diff/
+snapshots/report.html
+
+# Keep reference screenshots tracked
+# snapshots/reference/ is committed intentionally

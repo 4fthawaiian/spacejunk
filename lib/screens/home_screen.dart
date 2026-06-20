@@ -17,8 +17,19 @@ import '../utils/url_params.dart';
 
 /// Seconds per day
 const _daySecs = 86400.0;
-const _shareBaseUrl = 'https://spacejunk.4ft.me/';
+const _canonicalUrl = 'https://spacejunk.4ft.me/';
 const _allShellIds = {'LEO', 'MEO', 'GEO', 'Debris', 'Station', 'Rocket-Body'};
+
+/// The base URL used when building share links.
+/// Uses the current page origin on web so share links work on any deployment
+/// (test.4ft.me, spacejunk.4ft.me, localhost, etc), falling back to canonical.
+String get _shareBaseUrl {
+  if (kIsWeb) {
+    final origin = Uri.base.origin; // e.g. https://test.4ft.me
+    if (origin.isNotEmpty && origin != 'null') return '$origin/';
+  }
+  return _canonicalUrl;
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,6 +70,11 @@ class _HomeScreenState extends State<HomeScreen>
     for (final g in constellation.constellationGroups) g.id,
   };
   final Map<String, int> _constellationCounts = {};
+
+  // ---- Filter: country ----
+  /// Empty = all countries visible. Non-empty = only these owners shown.
+  final Set<String> _visibleCountries = {};
+  final Map<String, int> _countryCounts = {};
 
   // ---- Counts ----
   int _leoCount = 0, _meoCount = 0, _geoCount = 0, _debrisCount = 0;
@@ -212,6 +228,14 @@ class _HomeScreenState extends State<HomeScreen>
       _historicalOffsetDays = cfg.historicalOffsetDays!;
       _showTimeSlider = true;
     }
+
+    // Countries: additive isolation
+    if (cfg.countries.isNotEmpty) {
+      _visibleCountries.addAll(cfg.countries);
+      debugPrint(
+        'URL filter: isolating countries: ${cfg.countries.join(", ")}',
+      );
+    }
   }
 
   // ------------------------------------------------------------------
@@ -237,11 +261,24 @@ class _HomeScreenState extends State<HomeScreen>
       return _visibleConstellations.contains(p.constellation);
     }
 
+    /// Country filter: when [_visibleCountries] is non-empty, only particles
+    /// with a matching owner code pass through. Particles without SATCAT
+    /// metadata (e.g. procedural debris) are hidden too — if we don't know
+    /// the country, we don't show it.
+    bool passesCountry(DebrisParticle p) {
+      if (_visibleCountries.isEmpty) return true;
+      if (p.satcat == null) return false;
+      return _visibleCountries.contains(p.satcat!.owner);
+    }
+
     if (offsetMinutes == 0.0 && _propagators.isEmpty) {
       // No time offset, no live data — just filter
       _displayParticles = _allParticles
           .where(
-            (p) => _visibleShells.contains(p.shell) && passesConstellation(p),
+            (p) =>
+                _visibleShells.contains(p.shell) &&
+                passesConstellation(p) &&
+                passesCountry(p),
           )
           .toList();
       _computeCounts();
@@ -251,7 +288,10 @@ class _HomeScreenState extends State<HomeScreen>
     // Apply both filter and time offset
     final filtered = _allParticles
         .where(
-          (p) => _visibleShells.contains(p.shell) && passesConstellation(p),
+          (p) =>
+              _visibleShells.contains(p.shell) &&
+              passesConstellation(p) &&
+              passesCountry(p),
         )
         .toList();
 
@@ -341,6 +381,20 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  /// Toggle a country owner code. Works additively — when [_visibleCountries]
+  /// is empty, all countries are shown. Adding one enters "country isolate"
+  /// mode where only selected owners are shown (plus unknown/no-satcat).
+  void _toggleCountry(String ownerCode) {
+    setState(() {
+      if (_visibleCountries.contains(ownerCode)) {
+        _visibleCountries.remove(ownerCode);
+      } else {
+        _visibleCountries.add(ownerCode);
+      }
+      _applyFiltersAndTime();
+    });
+  }
+
   void _computeCounts() {
     _leoCount = 0;
     _meoCount = 0;
@@ -352,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen>
     for (final g in constellation.constellationGroups) {
       _constellationCounts[g.id] = 0;
     }
+    _countryCounts.clear();
     for (final p in _allParticles) {
       switch (p.shell) {
         case 'LEO':
@@ -377,6 +432,10 @@ class _HomeScreenState extends State<HomeScreen>
           _constellationCounts.containsKey(p.constellation)) {
         _constellationCounts[p.constellation!] =
             _constellationCounts[p.constellation!]! + 1;
+      }
+      if (p.satcat != null) {
+        final owner = p.satcat!.owner;
+        _countryCounts[owner] = (_countryCounts[owner] ?? 0) + 1;
       }
     }
     _totalCount = _allParticles.length;
@@ -625,6 +684,11 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
+    if (_visibleCountries.isNotEmpty) {
+      final sorted = _visibleCountries.toList()..sort();
+      params['countries'] = sorted.join(',');
+    }
+
     return Uri.parse(
       _shareBaseUrl,
     ).replace(queryParameters: params.isEmpty ? null : params);
@@ -813,6 +877,32 @@ class _HomeScreenState extends State<HomeScreen>
                   color: Colors.white.withValues(alpha: 0.5),
                   size: 20,
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Country filter button
+          GestureDetector(
+            onTap: _openCountryFilterSheet,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _visibleCountries.isNotEmpty
+                    ? const Color(0xFFF7C948).withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _visibleCountries.isNotEmpty
+                      ? const Color(0xFFF7C948).withValues(alpha: 0.25)
+                      : Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Icon(
+                Icons.public_rounded,
+                color: _visibleCountries.isNotEmpty
+                    ? const Color(0xFFF7C948).withValues(alpha: 0.8)
+                    : Colors.white.withValues(alpha: 0.5),
+                size: 20,
               ),
             ),
           ),
@@ -1294,6 +1384,18 @@ class _HomeScreenState extends State<HomeScreen>
                 padding: const EdgeInsets.only(top: 3),
                 child: Text(
                   'ISOLATING: ${_visibleConstellations.length} constellation(s) — other objects hidden',
+                  style: TextStyle(
+                    fontSize: 7,
+                    letterSpacing: 0.8,
+                    color: const Color(0xFFF7C948).withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            if (_visibleCountries.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  'COUNTRY: ${_visibleCountries.length} selected — others hidden',
                   style: TextStyle(
                     fontSize: 7,
                     letterSpacing: 0.8,
@@ -2032,6 +2134,7 @@ class _HomeScreenState extends State<HomeScreen>
       _visibleConstellations.addAll(
         constellation.constellationGroups.map((g) => g.id),
       );
+      _visibleCountries.clear();
       _applyFiltersAndTime();
     });
   }
@@ -2068,6 +2171,377 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+
+  // ------------------------------------------------------------------
+  // COUNTRY FILTER
+  // ------------------------------------------------------------------
+  void _openCountryFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0D0D0D),
+      barrierColor: Colors.black54,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _CountryFilterSheet(
+        visibleCountries: Set.from(_visibleCountries),
+        countryCounts: Map.from(_countryCounts),
+        onToggle: _toggleCountry,
+        onClear: () => setState(() {
+          _visibleCountries.clear();
+          _applyFiltersAndTime();
+        }),
+      ),
+    );
+  }
+}
+
+// ======================================================================
+// COUNTRY FILTER BOTTOM SHEET (Search + Toggle)
+// ======================================================================
+class _CountryFilterSheet extends StatefulWidget {
+  final Set<String> visibleCountries;
+  final Map<String, int> countryCounts;
+  final void Function(String ownerCode) onToggle;
+  final VoidCallback onClear;
+
+  const _CountryFilterSheet({
+    required this.visibleCountries,
+    required this.countryCounts,
+    required this.onToggle,
+    required this.onClear,
+  });
+
+  @override
+  _CountryFilterSheetState createState() => _CountryFilterSheetState();
+}
+
+class _CountryFilterSheetState extends State<_CountryFilterSheet> {
+  late Set<String> _selected;
+  late List<_CountryEntry> _allEntries;
+  List<_CountryEntry> _filtered = [];
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = Set.from(widget.visibleCountries);
+    _rebuildEntries();
+    _searchCtrl.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.removeListener(_onSearchChanged);
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _rebuildEntries() {
+    _allEntries = widget.countryCounts.entries
+        .map((e) => _CountryEntry(
+              ownerCode: e.key,
+              count: e.value,
+              info: lookupOwner(e.key),
+            ))
+        .toList()
+      ..sort((a, b) => b.count.compareTo(a.count));
+    _applyFilter();
+  }
+
+  void _onSearchChanged() {
+    _applyFilter();
+  }
+
+  void _applyFilter() {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filtered = List.from(_allEntries);
+      } else {
+        _filtered = _allEntries.where((e) {
+          return e.info.name.toLowerCase().contains(query) ||
+              e.ownerCode.toLowerCase().contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  void _handleToggle(String ownerCode) {
+    setState(() {
+      if (_selected.contains(ownerCode)) {
+        _selected.remove(ownerCode);
+      } else {
+        _selected.add(ownerCode);
+      }
+    });
+    widget.onToggle(ownerCode);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFilter = _selected.isNotEmpty;
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Title row
+          Row(
+            children: [
+              Icon(
+                Icons.public_rounded,
+                color: const Color(0xFFF7C948).withValues(alpha: 0.8),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Filter by Country',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              if (hasFilter)
+                TextButton(
+                  onPressed: () {
+                    setState(() => _selected.clear());
+                    widget.onClear();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Clear',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Hint
+          Text(
+            hasFilter
+                ? 'Showing only objects from selected countries'
+                : _allEntries.isEmpty
+                    ? 'No country data — enable cached data for SATCAT metadata'
+                    : 'Tap countries below to isolate — empty = show all',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.35),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Search field
+          if (_allEntries.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.search_rounded,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search countries…',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_searchCtrl.text.isNotEmpty)
+                    GestureDetector(
+                      onTap: () {
+                        _searchCtrl.clear();
+                      },
+                      child: Icon(
+                        Icons.clear_rounded,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Country list
+            Expanded(
+              child: _filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No countries match "${_searchCtrl.text}"',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: _filtered.length,
+                      separatorBuilder: (_, __) => Container(
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                      itemBuilder: (context, i) {
+                        final entry = _filtered[i];
+                        final isOn = _selected.contains(entry.ownerCode);
+                        return _countryRow(entry, isOn);
+                      },
+                    ),
+            ),
+          ] else ...[
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      size: 32,
+                      color: Colors.white.withValues(alpha: 0.15),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No SATCAT data available',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Country filtering needs enriched\ncache data from CelesTrak',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.25),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _countryRow(_CountryEntry entry, bool isOn) {
+    return GestureDetector(
+      onTap: () => _handleToggle(entry.ownerCode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Text(entry.info.flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                entry.info.name,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isOn ? FontWeight.w600 : FontWeight.w400,
+                  color: isOn
+                      ? Colors.white.withValues(alpha: 0.9)
+                      : Colors.white.withValues(alpha: 0.55),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${entry.count}',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              isOn ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              size: 20,
+              color: isOn
+                  ? const Color(0xFFF7C948).withValues(alpha: 0.8)
+                  : Colors.white.withValues(alpha: 0.15),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Data for one country entry in the filter sheet.
+class _CountryEntry {
+  final String ownerCode;
+  final int count;
+  final CountryInfo info;
+  const _CountryEntry({
+    required this.ownerCode,
+    required this.count,
+    required this.info,
+  });
 }
 
 // ======================================================================
