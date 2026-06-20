@@ -386,6 +386,12 @@ class CelestrakService {
 
         final constId = constellation.identifyConstellation(obj.name.toUpperCase());
 
+        // Parse launch year from SATCAT data if available
+        int? launchYear;
+        if (obj.satcat != null && obj.satcat!.launchDate.isNotEmpty) {
+          launchYear = _parseLaunchYear(obj.satcat!.launchDate);
+        }
+
         particles.add(DebrisParticle(
           x: modelX,
           y: modelY,
@@ -398,6 +404,7 @@ class CelestrakService {
           noradId: obj.noradId,
           satcat: obj.satcat,
           constellation: constId == 'other' ? null : constId,
+          launchYear: launchYear,
         ));
       } catch (e) {
         // Skip objects that fail to propagate
@@ -497,6 +504,22 @@ class CelestrakService {
       return null;
     } finally {
       _satcatLoading.remove(noradId);
+    }
+  }
+
+  /// Parse the launch year from a SATCAT launch date string.
+  /// SATCAT dates are ISO-8601 like "2024-01-15" or sometimes just "2024".
+  static int? _parseLaunchYear(String date) {
+    try {
+      return DateTime.parse(date).year;
+    } catch (_) {
+      // Maybe it's just a year string
+      final trimmed = date.trim();
+      if (trimmed.length == 4) {
+        final y = int.tryParse(trimmed);
+        if (y != null && y >= 1950 && y <= 2030) return y;
+      }
+      return null;
     }
   }
 

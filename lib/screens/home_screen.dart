@@ -76,6 +76,15 @@ class _HomeScreenState extends State<HomeScreen>
   final Set<String> _visibleCountries = {};
   final Map<String, int> _countryCounts = {};
 
+  // ---- Filter: launch decade ----
+  /// Empty = all decades visible. Non-empty = only objects whose launch year
+  /// falls within one of these decade ranges are shown.
+  final Set<int> _visibleDecades = {};
+  final Map<int, int> _decadeCounts = {};
+
+  // All decades from 1960s to 2020s (matches DebrisGenerator._decadeWeights)
+  static const _allDecades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
+
   // ---- Counts ----
   int _leoCount = 0, _meoCount = 0, _geoCount = 0, _debrisCount = 0;
   int _stationCount = 0, _totalCount = 0;
@@ -90,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _hasSeenInfo = false; // track whether the info dialog was shown
 
   // ---- Time slider (historical view) ----
-  double _historicalOffsetDays = 0.0; // days  -365..+365
+  double _historicalOffsetDays = 0.0; // days  -3650..+3650
   bool _showTimeSlider = false;
   bool _isAnimatingTime = false;
 
@@ -271,6 +280,32 @@ class _HomeScreenState extends State<HomeScreen>
       return _visibleCountries.contains(p.satcat!.owner);
     }
 
+    /// Launch year filter: when scrubbing into the past, hide objects
+    /// that hadn't been launched yet. Objects with unknown launch year
+    /// (null) are always shown — we don't have the data to filter them.
+    bool passesLaunchYear(DebrisParticle p) {
+      if (_historicalOffsetDays >= 0) return true; // present/future → show all
+      if (p.launchYear == null) return true; // unknown launch year → show
+      final targetDate = DateTime.now().toUtc().add(
+        Duration(milliseconds: (_historicalOffsetDays * _daySecs * 1000).round()),
+      );
+      return p.launchYear! <= targetDate.year;
+    }
+
+    /// Decade filter: when [_visibleDecades] is non-empty, only particles
+    /// whose launch year falls within one of the selected decades are shown.
+    /// Objects with unknown launch year are hidden when filtering by decade
+    /// (if we don't know when it launched, we can't confirm it's from the
+    /// selected era).
+    bool passesDecade(DebrisParticle p) {
+      if (_visibleDecades.isEmpty) return true;
+      if (p.launchYear == null) return false;
+      for (final d in _visibleDecades) {
+        if (p.launchYear! >= d && p.launchYear! < d + 10) return true;
+      }
+      return false;
+    }
+
     if (offsetMinutes == 0.0 && _propagators.isEmpty) {
       // No time offset, no live data — just filter
       _displayParticles = _allParticles
@@ -278,7 +313,9 @@ class _HomeScreenState extends State<HomeScreen>
             (p) =>
                 _visibleShells.contains(p.shell) &&
                 passesConstellation(p) &&
-                passesCountry(p),
+                passesCountry(p) &&
+                passesLaunchYear(p) &&
+                passesDecade(p),
           )
           .toList();
       _computeCounts();
@@ -291,7 +328,9 @@ class _HomeScreenState extends State<HomeScreen>
           (p) =>
               _visibleShells.contains(p.shell) &&
               passesConstellation(p) &&
-              passesCountry(p),
+              passesCountry(p) &&
+              passesLaunchYear(p) &&
+              passesDecade(p),
         )
         .toList();
 
@@ -343,6 +382,7 @@ class _HomeScreenState extends State<HomeScreen>
             noradId: p.noradId,
             satcat: p.satcat,
             constellation: p.constellation,
+            launchYear: p.launchYear,
           ),
         );
       }
@@ -395,6 +435,20 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  /// Toggle a launch decade filter. Works additively — when [_visibleDecades]
+  /// is empty, all decades are shown. Adding one enters "decade isolate"
+  /// mode where only objects launched in those decades are shown.
+  void _toggleDecade(int decade) {
+    setState(() {
+      if (_visibleDecades.contains(decade)) {
+        _visibleDecades.remove(decade);
+      } else {
+        _visibleDecades.add(decade);
+      }
+      _applyFiltersAndTime();
+    });
+  }
+
   void _computeCounts() {
     _leoCount = 0;
     _meoCount = 0;
@@ -407,6 +461,10 @@ class _HomeScreenState extends State<HomeScreen>
       _constellationCounts[g.id] = 0;
     }
     _countryCounts.clear();
+    _decadeCounts.clear();
+    for (final d in _allDecades) {
+      _decadeCounts[d] = 0;
+    }
     for (final p in _allParticles) {
       switch (p.shell) {
         case 'LEO':
@@ -436,6 +494,12 @@ class _HomeScreenState extends State<HomeScreen>
       if (p.satcat != null) {
         final owner = p.satcat!.owner;
         _countryCounts[owner] = (_countryCounts[owner] ?? 0) + 1;
+      }
+      if (p.launchYear != null) {
+        final d = (p.launchYear! ~/ 10) * 10;
+        if (_decadeCounts.containsKey(d)) {
+          _decadeCounts[d] = _decadeCounts[d]! + 1;
+        }
       }
     }
     _totalCount = _allParticles.length;
@@ -680,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (_showTimeSlider || _historicalOffsetDays != 0.0) {
       params['time'] = _formatShareNumber(
-        _historicalOffsetDays.clamp(-365, 365),
+        _historicalOffsetDays.clamp(-3650, 3650),
       );
     }
 
@@ -752,8 +816,8 @@ class _HomeScreenState extends State<HomeScreen>
     // Auto-animate time if playing
     if (_isAnimatingTime) {
       _historicalOffsetDays +=
-          0.03; // ~26 min of real time per second of playback
-      if (_historicalOffsetDays > 365) _historicalOffsetDays = -365;
+          0.3; // ~4.5 min of real time per second of playback (covers ±10y)
+      if (_historicalOffsetDays > 3650) _historicalOffsetDays = -3650;
       _applyFiltersAndTime();
     }
 
@@ -1403,6 +1467,18 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
+            if (_visibleDecades.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  'DECADE: ${_visibleDecades.map((d) => '${d}s').join(', ')}',
+                  style: TextStyle(
+                    fontSize: 7,
+                    letterSpacing: 0.8,
+                    color: const Color(0xFF4FC3F7).withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
             if (_fetchError.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1546,6 +1622,14 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
               const SizedBox(height: 10),
+
+              // ── Launch year (procedural-only fallback) ──
+              if (p.launchYear != null && satcat == null)
+                _metadataRow(
+                  Icons.rocket_launch_rounded,
+                  'Era',
+                  'Launched in the ${p.launchYear}s',
+                ),
 
               // ── SATCAT metadata (rich) ──
               if (satcat != null) ...[
@@ -1781,6 +1865,20 @@ class _HomeScreenState extends State<HomeScreen>
         ? 'PAST'
         : (_historicalOffsetDays > 0 ? 'FUTURE' : 'NOW');
 
+    // Count objects hidden due to launch year filter
+    final hiddenByLaunchYear = _historicalOffsetDays < 0
+        ? _allParticles.where((p) {
+            if (p.launchYear == null) return false;
+            final targetDate = DateTime.now().toUtc().add(
+              Duration(
+                milliseconds:
+                    (_historicalOffsetDays * _daySecs * 1000).round(),
+              ),
+            );
+            return p.launchYear! > targetDate.year;
+          }).length
+        : 0;
+
     return Positioned(
       bottom: 100,
       left: 0,
@@ -1838,6 +1936,28 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
+                // Launch year hidden count
+                if (hiddenByLaunchYear > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '−$hiddenByLaunchYear not yet launched',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Colors.white.withValues(alpha: 0.35),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 // Play/pause
                 GestureDetector(
@@ -1852,11 +1972,50 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
+            // Decade quick-filter chips
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  for (final d in _allDecades) ...[
+                    if (d > 1960) const SizedBox(width: 4),
+                    _decadeChip(d),
+                  ],
+                  if (_visibleDecades.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _visibleDecades.clear();
+                        _applyFiltersAndTime();
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'clear',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Colors.white.withValues(alpha: 0.3),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             // Slider
             Row(
               children: [
                 Text(
-                  '-1y',
+                  '-10y',
                   style: TextStyle(
                     fontSize: 9,
                     color: Colors.white.withValues(alpha: 0.2),
@@ -1880,14 +2039,14 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     child: Slider(
                       value: _historicalOffsetDays,
-                      min: -365,
-                      max: 365,
+                      min: -3650,
+                      max: 3650,
                       onChanged: _onTimeSliderChanged,
                     ),
                   ),
                 ),
                 Text(
-                  '+1y',
+                  '+10y',
                   style: TextStyle(
                     fontSize: 9,
                     color: Colors.white.withValues(alpha: 0.2),
@@ -1895,6 +2054,58 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A small toggle chip for a launch decade, shown in the time controls.
+  Widget _decadeChip(int decade) {
+    final isSelected = _visibleDecades.contains(decade);
+    final count = _decadeCounts[decade] ?? 0;
+    return GestureDetector(
+      onTap: () => _toggleDecade(decade),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF4FC3F7).withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF4FC3F7).withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.1),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${decade}s',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? const Color(0xFF4FC3F7).withValues(alpha: 0.9)
+                    : Colors.white.withValues(alpha: 0.35),
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 2),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 7,
+                  color: isSelected
+                      ? const Color(0xFF4FC3F7).withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.15),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -2135,6 +2346,7 @@ class _HomeScreenState extends State<HomeScreen>
         constellation.constellationGroups.map((g) => g.id),
       );
       _visibleCountries.clear();
+      _visibleDecades.clear();
       _applyFiltersAndTime();
     });
   }

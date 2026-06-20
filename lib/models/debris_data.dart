@@ -21,6 +21,11 @@ class DebrisParticle {
   /// Null for procedural particles.
   final String? constellation;
 
+  /// Launch year for historical filtering. Null for unknown/untracked.
+  /// Set from SATCAT launchDate for live objects, or assigned from
+  /// a historical distribution for procedural objects.
+  final int? launchYear;
+
   DebrisParticle({
     required this.x,
     required this.y,
@@ -33,6 +38,7 @@ class DebrisParticle {
     this.noradId = 0,
     this.satcat,
     this.constellation,
+    this.launchYear,
   });
 }
 
@@ -44,6 +50,32 @@ class DebrisGenerator {
   /// Convert altitude to model units (distance from center)
   static double altitudeToRadius(double altKm) {
     return (earthRadius + altKm) * scaleFactor;
+  }
+
+  /// Weighted distribution of procedural objects across decades.
+  /// Mirrors real historical launch activity growth.
+  static const Map<int, double> _decadeWeights = {
+    1960: 0.03,  // 3%  — early space race
+    1970: 0.05,  // 5%  — first stations, more launches
+    1980: 0.08,  // 8%  — shuttle era, military sats
+    1990: 0.12,  // 12% — commercial sats, GPS, Iridium
+    2000: 0.17,  // 17% — internet boom, more debris
+    2010: 0.25,  // 25% — CubeSats, small sats
+    2020: 0.30,  // 30% — mega-constellations (Starlink etc.)
+  };
+
+  /// Assign a synthetic launch year for a procedural particle.
+  static int _randomDecadeYear(Random rng) {
+    final total = _decadeWeights.values.fold(0.0, (a, b) => a + b);
+    var roll = rng.nextDouble() * total;
+    for (final entry in _decadeWeights.entries) {
+      roll -= entry.value;
+      if (roll <= 0) {
+        // Random year within the decade
+        return entry.key + rng.nextInt(10);
+      }
+    }
+    return 2020 + rng.nextInt(5); // fallback to 2020s
   }
 
   /// Generate a population of debris particles.
@@ -102,6 +134,10 @@ class DebrisGenerator {
         final name = shell.label == 'Station'
             ? _stationNames[_stationIndex++ % _stationNames.length]
             : null;
+
+        // Assign a historical launch year from weighted distribution
+        final launchYear = _randomDecadeYear(rng);
+
         particles.add(DebrisParticle(
           x: x,
           y: y,
@@ -111,6 +147,7 @@ class DebrisGenerator {
           color: color,
           size: shell.baseSize * (0.6 + rng.nextDouble() * 0.8),
           name: name,
+          launchYear: launchYear,
         ));
       }
     }

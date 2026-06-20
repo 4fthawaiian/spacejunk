@@ -1,0 +1,17 @@
+{
+  "name": "spacejunk-visual-snapshots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "snapshots": "node scripts/snapshots.mjs",
+    "snapshots:build": "flutter build web --wasm && node scripts/snapshots.mjs",
+    "visual:diff": "node scripts/visual-diff.mjs",
+    "visual:update": "node scripts/visual-diff.mjs --update",
+    "visual:report": "open snapshots/report.html"
+  },
+  "devDependencies": {
+    "playwright": "^1.52.0",
+    "pixelmatch": "^6.0.0",
+    "pngjs": "^7.0.0"
+  }
+}
