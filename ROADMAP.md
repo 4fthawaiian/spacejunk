@@ -18,6 +18,7 @@
 - [x] Decade filter chips (60s→20s) inline in time panel — instant "show me what orbit looked like in the [X] decade"; stacks with all other filters
 - [x] Visual snapshot testing — Playwright + pixelmatch with 10 scenarios, reference baselines committed, CI-compatible
 - [x] Tap popup info cards showing object name, shell, altitude, data source
+- [x] Shareable view links — decade filter now included (`?decades=1960,1990,2020`)
 - [x] Station markers drawn on top of Earth — refined diamond marker with subtle glow + white center
 - [x] Info dialog (ⓘ) — explains app concept, orbital shells, data sources, scale
 - [x] CORS proxy fallback for web builds

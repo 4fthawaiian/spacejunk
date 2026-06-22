@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="SpaceJunk — 3D space debris visualization" src="new_screenshot.png" width="100%">
+  <img alt="SpaceJunk — 3D space debris visualization" src="screenshots/hero.png" width="100%">
 </p>
 
 <p align="center">
@@ -39,9 +39,13 @@ SpaceJunk renders the orbital debris environment around Earth in real-time 3D. H
 
 ## 📸 Screenshots
 
-| Debris view | Filter panel | Tap popup |
+| Default view | Constellation filter | Historical view |
 |:---:|:---:|:---:|
-| ![Main view](new_screenshot.png) | *(filter sheet with per-shell toggles)* | *(tap any object for details)* |
+| ![Default view](screenshots/hero.png) | ![Starlink filtered](screenshots/constellation-filter.png) | ![Historical -90 days](screenshots/historical-view.png) |
+
+| Mobile |
+|:---:|
+| ![Mobile view](screenshots/mobile.png) |
 
 ## 🚀 Getting Started
 
