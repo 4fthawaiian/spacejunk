@@ -38,63 +38,63 @@ const SCENARIOS = [
   {
     name: 'desktop-default',
     viewport: { width: 1920, height: 1080 },
-    url: '/',
+    url: '/?noInfo',
     desc: 'Default view on load, desktop',
   },
   {
     name: 'desktop-hide-debris',
     viewport: { width: 1920, height: 1080 },
-    url: '/?hideShells=Debris',
+    url: '/?noInfo&hideShells=Debris',
     desc: 'Debris shell hidden',
   },
   {
     name: 'desktop-starlink-only',
     viewport: { width: 1920, height: 1080 },
-    url: '/?constellations=starlink&zoom=1.5',
+    url: '/?noInfo&constellations=starlink&zoom=1.5',
     desc: 'Starlink filtered, zoomed in',
   },
   {
     name: 'desktop-constellations-gps',
     viewport: { width: 1920, height: 1080 },
-    url: '/?constellations=gps,iridium&zoom=1.3',
+    url: '/?noInfo&constellations=gps,iridium&zoom=1.3',
     desc: 'GPS + Iridium constellations',
   },
   {
     name: 'desktop-time-plus30',
     viewport: { width: 1920, height: 1080 },
-    url: '/?time=30',
+    url: '/?noInfo&time=30',
     desc: 'Time scrubber at +30 days',
   },
   {
     name: 'desktop-time-minus90',
     viewport: { width: 1920, height: 1080 },
-    url: '/?time=-90',
+    url: '/?noInfo&time=-90',
     desc: 'Time scrubber at -90 days',
   },
   {
     name: 'desktop-starfield-off',
     viewport: { width: 1920, height: 1080 },
-    url: '/?starfield=false',
+    url: '/?noInfo&starfield=false',
     desc: 'Starfield disabled',
   },
   // ── Tablet (1024×768) ───────────────────────────────────────────────────
   {
     name: 'tablet-default',
     viewport: { width: 1024, height: 768 },
-    url: '/',
+    url: '/?noInfo',
     desc: 'Tablet viewport',
   },
   // ── Mobile (390×844) ───────────────────────────────────────────────────
   {
     name: 'mobile-default',
     viewport: { width: 390, height: 844 },
-    url: '/',
+    url: '/?noInfo',
     desc: 'Mobile viewport, default state',
   },
   {
     name: 'mobile-zoom',
     viewport: { width: 390, height: 844 },
-    url: '/?zoom=1.8&constellations=starlink',
+    url: '/?noInfo&zoom=1.8&constellations=starlink',
     desc: 'Mobile, zoomed in on Starlink',
   },
 ];

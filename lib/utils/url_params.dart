@@ -31,6 +31,10 @@ class UrlFilterConfig {
   /// When non-empty, only objects launched in these decades are shown.
   final Set<int> decades;
 
+  /// Whether to show the first-visit info dialog. When true, the info
+  /// dialog is suppressed even on first load (for screenshot/embed mode).
+  final bool noInfo;
+
   /// Whether to force isolation mode (hide non-constellation objects).
   bool get isolation => constellations.isNotEmpty;
 
@@ -41,6 +45,7 @@ class UrlFilterConfig {
     this.historicalOffsetDays,
     this.countries = const {},
     this.decades = const {},
+    this.noInfo = false,
   });
 }
 
@@ -107,6 +112,9 @@ UrlFilterConfig parseUrlParams() {
         .toSet();
   }
 
+  // Suppress info dialog (for screenshot/embed mode)
+  final noInfo = params.containsKey('noInfo');
+
   return UrlFilterConfig(
     constellations: constellations,
     hideShells: hideShells,
@@ -114,5 +122,6 @@ UrlFilterConfig parseUrlParams() {
     historicalOffsetDays: time,
     countries: countries,
     decades: decades,
+    noInfo: noInfo,
   );
 }

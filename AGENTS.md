@@ -50,6 +50,10 @@
        npm run visual:diff         # compare current vs reference (exit 1 if mismatches)
        npm run visual:update       # accept current as new baseline
        npm run visual:report       # open snapshots/report.html
+   ── ⚠ IMPORTANT: Always include `?noInfo` in ALL snapshot scenario URLs! The info
+       dialog auto-shows on first visit and will ruin screenshots. The `noInfo` URL
+       parameter suppresses it by pre-setting the "has seen info" flag in SharedPreferences.
+       See scripts/snapshots.mjs for the current scenarios.
    ── Reference baselines live in snapshots/reference/ (committed to git)
    ── Current/diff outputs in snapshots/current/ and snapshots/diff/ (gitignored)
    ── Dependencies: playwright, pixelmatch, pngjs (in package.json devDeps)

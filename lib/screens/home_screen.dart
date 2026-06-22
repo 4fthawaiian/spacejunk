@@ -97,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _fetchError = '';
   bool _showControlsHint = true;
   bool _hasSeenInfo = false; // track whether the info dialog was shown
+  bool _suppressInfoDialog = false; // set via ?noInfo URL param for screenshots
 
   // ---- Time slider (historical view) ----
   double _historicalOffsetDays = 0.0; // days  -3650..+3650
@@ -118,9 +119,9 @@ class _HomeScreenState extends State<HomeScreen>
     SharedPreferences.getInstance().then((prefs) {
       final seen = prefs.getBool('hasSeenInfo') ?? false;
       setState(() {
-        _hasSeenInfo = seen;
+        _hasSeenInfo = seen || _suppressInfoDialog;
       });
-      if (!seen) {
+      if (!seen && !_suppressInfoDialog) {
         // Show dialog on first visit
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && context != null) {
@@ -129,6 +130,12 @@ class _HomeScreenState extends State<HomeScreen>
             prefs.setBool('hasSeenInfo', true);
           }
         });
+      }
+      if (_suppressInfoDialog) {
+        // Mark as seen so fresh visits without ?noInfo don't show it either
+        // (this is intentional — the user already saw it, or this is a headless
+        //  screenshot scenario where we don't want it)
+        prefs.setBool('hasSeenInfo', true);
       }
     });
     _allParticles = DebrisGenerator.generate();
@@ -254,6 +261,12 @@ class _HomeScreenState extends State<HomeScreen>
       );
       // Also show the time slider to make the decade chips visible
       _showTimeSlider = true;
+    }
+
+    // Suppress first-visit info dialog (for screenshot/embed scenarios)
+    if (cfg.noInfo) {
+      _suppressInfoDialog = true;
+      debugPrint('URL filter: info dialog suppressed');
     }
   }
 
