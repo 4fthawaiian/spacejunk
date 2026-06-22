@@ -245,6 +245,16 @@ class _HomeScreenState extends State<HomeScreen>
         'URL filter: isolating countries: ${cfg.countries.join(", ")}',
       );
     }
+
+    // Decades: additive isolation
+    if (cfg.decades.isNotEmpty) {
+      _visibleDecades.addAll(cfg.decades);
+      debugPrint(
+        'URL filter: showing only decades: ${cfg.decades.join(", ")}',
+      );
+      // Also show the time slider to make the decade chips visible
+      _showTimeSlider = true;
+    }
   }
 
   // ------------------------------------------------------------------
@@ -755,6 +765,11 @@ class _HomeScreenState extends State<HomeScreen>
     if (_visibleCountries.isNotEmpty) {
       final sorted = _visibleCountries.toList()..sort();
       params['countries'] = sorted.join(',');
+    }
+
+    if (_visibleDecades.isNotEmpty) {
+      final sorted = _visibleDecades.toList()..sort();
+      params['decades'] = sorted.map((d) => d.toString()).join(',');
     }
 
     return Uri.parse(

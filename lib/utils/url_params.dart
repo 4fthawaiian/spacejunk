@@ -4,6 +4,9 @@
 /// which is harmless — the app just uses default state.
 library;
 
+/// All valid decade start years for URL param validation.
+const _allDecades = {1960, 1970, 1980, 1990, 2000, 2010, 2020};
+
 /// Parsed URL filter configuration.
 class UrlFilterConfig {
   /// Constellation IDs to show (e.g. ['starlink', 'gps']).
@@ -24,6 +27,10 @@ class UrlFilterConfig {
   /// (plus objects without country data, which pass through).
   final Set<String> countries;
 
+  /// Launch decades to show (e.g. {1960, 1990, 2020}).
+  /// When non-empty, only objects launched in these decades are shown.
+  final Set<int> decades;
+
   /// Whether to force isolation mode (hide non-constellation objects).
   bool get isolation => constellations.isNotEmpty;
 
@@ -33,6 +40,7 @@ class UrlFilterConfig {
     this.zoom,
     this.historicalOffsetDays,
     this.countries = const {},
+    this.decades = const {},
   });
 }
 
@@ -87,11 +95,24 @@ UrlFilterConfig parseUrlParams() {
         .toSet();
   }
 
+  // Decades: CSV of decade start years (e.g. "1960,1990,2020")
+  Set<int> decades = {};
+  if (params.containsKey('decades')) {
+    final raw = params['decades']!;
+    decades = raw
+        .split(',')
+        .map((s) => int.tryParse(s.trim()))
+        .where((d) => d != null && _allDecades.contains(d))
+        .cast<int>()
+        .toSet();
+  }
+
   return UrlFilterConfig(
     constellations: constellations,
     hideShells: hideShells,
     zoom: zoom,
     historicalOffsetDays: time,
     countries: countries,
+    decades: decades,
   );
 }
