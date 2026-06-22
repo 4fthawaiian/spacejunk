@@ -3,6 +3,7 @@
 ## ✨ Done
 
 - [x] 3D orbital visualization with CustomPainter + perspective projection
+- [x] Zoom-dependent object sizing — debris dots and station markers now physically grow as you zoom in, making selection much easier at high zoom levels (relativeZoom multiplier, tap threshold scales proportionally)
 - [x] Procedural debris generation (~15,800 particles in LEO/MEO/GEO/Debris/Station shells)
 - [x] Interactive controls (drag to orbit, pinch to zoom, auto-rotation)
 - [x] Live data from CelesTrak JSON API (TLE orbital elements)

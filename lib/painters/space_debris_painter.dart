@@ -33,6 +33,10 @@ class SpaceDebrisPainter extends CustomPainter {
     final baseScale = min(size.width, size.height) * 0.38;
     final scale = baseScale * zoom;
 
+    // Relative zoom so objects visually scale up as we zoom in
+    // (zoom=0.45 is the default, so relativeZoom=1.0 at default)
+    final relativeZoom = (zoom / 0.45).clamp(0.7, 4.0);
+
     // 1. Starfield background
     if (showStars) _drawStars(canvas, size);
 
@@ -43,10 +47,10 @@ class SpaceDebrisPainter extends CustomPainter {
     _drawEarth(canvas, cx, cy, scale);
 
     // 4. Debris particles (on top of Earth)
-    _drawDebris(canvas, cx, cy, scale, size);
+    _drawDebris(canvas, cx, cy, scale, size, relativeZoom);
 
     // 5. Station markers (on top of everything)
-    _drawStations(canvas, cx, cy, scale, size);
+    _drawStations(canvas, cx, cy, scale, size, relativeZoom);
 
     canvas.restore();
   }
@@ -272,7 +276,7 @@ class SpaceDebrisPainter extends CustomPainter {
   // ------------------------------------------------------------------
   // Debris rendering
   // ------------------------------------------------------------------
-  void _drawDebris(Canvas canvas, double cx, double cy, double scale, Size canvasSize) {
+  void _drawDebris(Canvas canvas, double cx, double cy, double scale, Size canvasSize, double relativeZoom) {
     final count = particles.length;
     if (count == 0) return;
 
@@ -312,7 +316,7 @@ class SpaceDebrisPainter extends CustomPainter {
 
       // Size attenuation with depth
       final sizeFactor = 2.0 / (2.0 + pp.sz * 0.5);
-      final drawSize = (pp.size * sizeFactor * (0.8 + 0.2 * sin(time * 2.0 + pp.sz * 10.0))).clamp(0.3, 3.5);
+      final drawSize = (pp.size * sizeFactor * relativeZoom * (0.8 + 0.2 * sin(time * 2.0 + pp.sz * 10.0))).clamp(0.3, 5.0);
 
       canvas.drawCircle(Offset(pp.sx, pp.sy), drawSize, paint);
 
@@ -327,7 +331,7 @@ class SpaceDebrisPainter extends CustomPainter {
   // ------------------------------------------------------------------
   // Stations — drawn on top of Earth so they always pop
   // ------------------------------------------------------------------
-  void _drawStations(Canvas canvas, double cx, double cy, double scale, Size canvasSize) {
+  void _drawStations(Canvas canvas, double cx, double cy, double scale, Size canvasSize, double relativeZoom) {
     final bounds = Rect.fromLTWH(-50, -50, canvasSize.width + 100, canvasSize.height + 100);
     const gold = Color(0xFFFFD740);
 
@@ -343,9 +347,9 @@ class SpaceDebrisPainter extends CustomPainter {
       final depthFactor = ((sz + 2.0) / 3.5).clamp(0.0, 1.0);
       final opacity = (0.7 + 0.3 * depthFactor).clamp(0.0, 1.0);
 
-      // Station size scales with depth
+      // Station size scales with depth and relative zoom
       final baseSize = 10.0;
-      final stationSize = baseSize * (0.8 + 0.4 * depthFactor);
+      final stationSize = baseSize * (0.8 + 0.4 * depthFactor) * relativeZoom;
 
       // Draw refined station marker
       _drawStationMarker(canvas, sx, sy, stationSize, opacity, gold);

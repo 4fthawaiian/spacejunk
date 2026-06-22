@@ -568,9 +568,13 @@ class _HomeScreenState extends State<HomeScreen>
     final baseScale = min(size.width, size.height) * 0.38;
     final scale = baseScale * _zoom;
 
+    // Scale tap threshold with zoom so bigger dots are easier to hit
+    final relativeZoom = (_zoom / 0.45).clamp(0.7, 4.0);
+    final tapThreshold = 30.0 * relativeZoom;
+
     // Project all display particles and find nearest within threshold
     DebrisParticle? nearest;
-    double nearestDist = 30.0; // pixel threshold
+    double nearestDist = tapThreshold; // pixel threshold, zooms with dots
     double nearestSz = 0;
     final scratch = <double>[0, 0, 0];
 
