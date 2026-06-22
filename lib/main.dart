@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
 void main() {
-  runApp(const TrashMapApp());
+  runApp(const SpaceJunkApp());
 }
 
-class TrashMapApp extends StatelessWidget {
-  const TrashMapApp({super.key});
+class SpaceJunkApp extends StatelessWidget {
+  const SpaceJunkApp({super.key});
 
   @override
   Widget build(BuildContext context) {

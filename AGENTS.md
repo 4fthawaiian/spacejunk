@@ -9,7 +9,7 @@
 -- ⚠ DEV SERVER: Do NOT touch/restart the dev `serve` process unless you have verified it is down
    (check with `ps aux | grep serve` or `curl localhost:3000`). The test site will be unreachable if the
    serve process is killed/restarted unexpectedly.
--- app is branded as SpaceJunk (not TrashMap) everywhere user-facing
+-- app is branded as SpaceJunk everywhere user-facing (repo was renamed from trashmap → spacejunk)
 -- this is a flutter app, concentrated on web and android for now
 -- android wireless ADB device: M7 (paired via mDNS, serial adb-0123456789ABCDEF-vN4MkB)
 -- once a new change is tested and pushed, remind the user to update the roadmap

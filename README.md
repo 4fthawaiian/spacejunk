@@ -58,7 +58,7 @@ SpaceJunk renders the orbital debris environment around Earth in real-time 3D. H
 ### Run on Android
 
 ```bash
-cd trashmap
+cd spacejunk
 flutter run -d <device-id>
 ```
 
@@ -153,4 +153,4 @@ MIT — use freely, adapt openly.
 
 ---
 
-*Built from scratch in a single ~3-hour session with [Paseo](https://github.com/4fthawaiian/trashmap) — an AI coding companion that turns ideas into working software. No templates, no boilerplate, just a conversation and a vision.*
+*Built from scratch in a single ~3-hour session with [Paseo](https://github.com/4fthawaiian/spacejunk) — an AI coding companion that turns ideas into working software. No templates, no boilerplate, just a conversation and a vision.*
