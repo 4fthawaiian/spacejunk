@@ -19,13 +19,15 @@
    2. /api/tle.json (self-hosted cache, same-origin, web only)
    3. Procedural simulation (always works)
 -- Self-hosted TLE cache: bundled at CI build time by scripts/fetch-tle.mjs,
-  refreshed on the server every 30 min by a cron job that runs
+  refreshed on the server every 6 hours by a cron job that runs
   /opt/junk/api/fetch-tle.py (Python, fetches 14 CelesTrak groups, dedup by NORAD_ID)
+  ⚠ fetch-tle.py now has a safety guard: if zero objects are fetched (rate-limited),
+    it preserves the existing valid cache instead of overwriting it with an empty array.
 -- Nginx config on server.4ft.me: proxy_cache to Celestrak at /api/tle.json
   with 30min TTL + stale-while-revalidate + `try_files` fallback to proxy.
   Both spacejunk.4ft.me and junk.4ft.me vhosts have this configured.
 -- Server setup: /opt/junk/api/ contains the TLE snapshot + fetch-tle.py script.
-  Cron in /etc/cron.d/spacejunk-tle refreshes every 30 min (see below for disabling).
+  Cron in /etc/cron.d/spacejunk-tle refreshes every 6 hours (see cadence history below).
 
 -- CelesTrak rate-limiting history:
   - 30-min polling got us banned (~2026-06-11)

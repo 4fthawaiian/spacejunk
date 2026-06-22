@@ -158,7 +158,17 @@ def main():
     print(f"\nTotal unique TLE objects: {len(merged)}")
 
     if len(merged) == 0:
-        print("WARNING: No TLE objects fetched - writing empty snapshot")
+        # Check if we already have a valid cache — never overwrite good data with empty!
+        if os.path.exists(OUTPUT):
+            try:
+                with open(OUTPUT) as f:
+                    existing = json.load(f)
+                if isinstance(existing, list) and len(existing) > 0:
+                    print(f"WARNING: No objects fetched — preserving existing cache ({len(existing)} objects)")
+                    return
+            except (json.JSONDecodeError, OSError):
+                pass
+        print("WARNING: No TLE objects fetched and no existing cache — writing empty snapshot")
         with open(OUTPUT, "w") as f:
             json.dump([], f)
         return
